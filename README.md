@@ -4,33 +4,7 @@ A Nextflow (DSL2) port of [ulana-ht](https://github.com/ehill-iolani/ulana-ht):
 bacterial whole-genome assembly and downstream characterization from Oxford
 Nanopore long reads. Flye assembly, optional Medaka polishing, Prokka
 annotation, CheckM QC, marker-gene extraction, and AMRFinderPlus AMR
-detection -- the same steps and feature toggles as the Snakemake original,
-reimplemented so it can run standalone from a terminal *or* be launched by a
-front end/backend the way [edna-ont-nf](https://github.com/ehill-iolani/edna-ont-nf)
-is designed to be.
-
-## Why a rewrite, not a wrapper
-
-Both `ulana-nf` and `edna-ont-nf` are meant to eventually submit into the same
-centralized hub for non-specialist users, so they share one integration
-contract instead of each inventing its own:
-
-- **Samplesheet schema** -- both pipelines take `--input samplesheet.csv` with
-  the same two columns, `sample,fastq` (`fastq` may be a single file or a
-  glob matching multiple part-files).
-- **`nextflow_schema.json`** -- every `--param` is described here (type,
-  default, validation, help text), grouped into the same sections a UI would
-  render as a form. This is the nf-core convention specifically meant to
-  drive auto-generated launch UIs (Seqera Platform, nf-core/launch, or a
-  custom backend) -- a backend reads this file to build the submission form
-  instead of hardcoding one per pipeline.
-- **One process per tool, one container each** (`modules/*.nf`), chained by a
-  single subworkflow (`workflows/ulana_wgs.nf`) that `main.nf` calls -- same
-  shape as `edna-ont-nf`'s `workflows/edna_amplicon.nf`.
-- **`-profile test`** -- every pipeline in the hub should be runnable against
-  a small checked-in synthetic dataset with no external data, so CI (and a
-  backend's own smoke test before accepting a submission) can validate the
-  pipeline the same way regardless of which tool it's calling.
+detection (the same steps and feature toggles as the Snakemake/RShiny original).
 
 ## What it does
 
