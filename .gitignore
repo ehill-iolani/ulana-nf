@@ -1,0 +1,20 @@
+# Nextflow
+work/
+.nextflow/
+.nextflow.log*
+results/
+
+# raw sequencing data -- large and run-specific; point --input at your own
+# copy. The small synthetic dataset for -profile test lives under
+# tests/data/ instead, and is tracked normally.
+/data/
+assets/*.fastq*
+assets/*.csv
+
+# personal/local
+notes.sh
+scratch.sh
+
+# OS
+.DS_Store
+**/.DS_Store

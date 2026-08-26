@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema",
+  "$id": "https://raw.githubusercontent.com/ehill-iolani/ulana-nf/main/nextflow_schema.json",
+  "title": "ulana-nf pipeline parameters",
+  "description": "Bacterial whole-genome assembly and characterization from Oxford Nanopore long reads: Flye assembly, optional Medaka polishing, Prokka annotation, CheckM QC, marker-gene extraction, and AMRFinderPlus AMR detection.",
+  "type": "object",
+  "$defs": {
+    "input_output_options": {
+      "title": "Input/output options",
+      "type": "object",
+      "description": "Define where the pipeline should find input data and save output data.",
+      "required": ["input"],
+      "properties": {
+        "input": {
+          "type": "string",
+          "format": "file-path",
+          "exists": true,
+          "mimetype": "text/csv",
+          "pattern": "^\\S+\\.csv$",
+          "description": "Samplesheet CSV with two columns: sample,fastq.",
+          "help_text": "Each row maps a sample name to a fastq(.gz) file or glob. A glob may match multiple part-files -- they're merged into one file per sample before filtering. Glob paths resolve relative to the launch directory, not the samplesheet's own location."
+        },
+        "outdir": {
+          "type": "string",
+          "format": "directory-path",
+          "default": "results",
+          "description": "Output directory where results are published."
+        }
+      }
+    },
+    "read_filtering": {
+      "title": "Read filtering",
+      "type": "object",
+      "description": "chopper quality/length filtering.",
+      "properties": {
+        "chopper_q": {
+          "type": "integer",
+          "default": 10,
+          "minimum": 0,
+          "description": "Minimum average read quality (Phred score)."
+        },
+        "chopper_minlength": {
+          "type": "integer",
+          "default": 1000,
+          "minimum": 1,
+          "description": "Minimum read length."
+        }
+      }
+    },
+    "assembly": {
+      "title": "Assembly",
+      "type": "object",
+      "description": "Flye assembly.",
+      "properties": {
+        "flye_mode": {
+          "type": "string",
+          "default": "--nano-hq",
+          "enum": ["--nano-hq", "--nano-raw", "--nano-corr"],
+          "description": "Flye read-type flag.",
+          "help_text": "--nano-hq for modern high-accuracy basecalling (Guppy5+/Dorado SUP), --nano-raw for older/lower-accuracy reads, --nano-corr for pre-corrected reads."
+        }
+      }
+    },
+    "polishing": {
+      "title": "Polishing",
+      "type": "object",
+      "description": "Medaka polishing of the Flye assembly.",
+      "properties": {
+        "enable_medaka": {
+          "type": "boolean",
+          "default": true,
+          "description": "Polish the Flye assembly with Medaka.",
+          "help_text": "When enabled, every downstream step (Prokka/CheckM/AMRFinder/id_genes) consumes the Medaka-polished assembly instead of the raw Flye assembly."
+        },
+        "medaka_model": {
+          "type": "string",
+          "default": "r1041_e82_400bps_hac_v5.0.0",
+          "description": "Medaka consensus model name.",
+          "help_text": "Must match the basecaller/flowcell/chemistry combination used to generate the reads -- see `medaka tools list_models`."
+        }
+      }
+    },
+    "annotation": {
+      "title": "Annotation",
+      "type": "object",
+      "description": "Prokka annotation.",
+      "properties": {
+        "enable_prokka": {
+          "type": "boolean",
+          "default": true,
+          "description": "Annotate the assembly with Prokka.",
+          "help_text": "Required by --enable_id_genes and --enable_amrfinder, which both consume Prokka's output."
+        }
+      }
+    },
+    "quality_control": {
+      "title": "Quality control",
+      "type": "object",
+      "description": "CheckM completeness/contamination QC.",
+      "properties": {
+        "enable_checkm": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run CheckM on the assembly."
+        }
+      }
+    },
+    "identifier_genes": {
+      "title": "Identifier genes",
+      "type": "object",
+      "description": "Marker gene extraction from Prokka output.",
+      "properties": {
+        "enable_id_genes": {
+          "type": "boolean",
+          "default": true,
+          "description": "Extract 16S rRNA, dnaA, and rpoB sequences from the Prokka annotation.",
+          "help_text": "Requires --enable_prokka."
+        }
+      }
+    },
+    "amr_detection": {
+      "title": "AMR detection",
+      "type": "object",
+      "description": "AMRFinderPlus antimicrobial resistance gene detection.",
+      "properties": {
+        "enable_amrfinder": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run AMRFinderPlus on the annotated assembly.",
+          "help_text": "Requires --enable_prokka. The AMRFinderPlus database is downloaded fresh at the start of every run."
+        }
+      }
+    },
+    "generic_options": {
+      "title": "Generic options",
+      "type": "object",
+      "description": "Less common options, typically left at their defaults.",
+      "properties": {
+        "help": {
+          "type": "boolean",
+          "default": false,
+          "description": "Display the help message and exit.",
+          "hidden": true
+        },
+        "tracedir": {
+          "type": "string",
+          "format": "directory-path",
+          "default": "results/pipeline_info",
+          "description": "Directory for the Nextflow timeline/report/trace files.",
+          "hidden": true
+        }
+      }
+    }
+  },
+  "allOf": [
+    { "$ref": "#/$defs/input_output_options" },
+    { "$ref": "#/$defs/read_filtering" },
+    { "$ref": "#/$defs/assembly" },
+    { "$ref": "#/$defs/polishing" },
+    { "$ref": "#/$defs/annotation" },
+    { "$ref": "#/$defs/quality_control" },
+    { "$ref": "#/$defs/identifier_genes" },
+    { "$ref": "#/$defs/amr_detection" },
+    { "$ref": "#/$defs/generic_options" }
+  ]
+}
