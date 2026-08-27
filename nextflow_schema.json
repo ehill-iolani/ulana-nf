@@ -61,6 +61,25 @@
         }
       }
     },
+    "assembly_graph_image": {
+      "title": "Assembly graph image",
+      "type": "object",
+      "description": "Bandage rendering of the Flye assembly graph.",
+      "properties": {
+        "enable_bandage": {
+          "type": "boolean",
+          "default": true,
+          "description": "Render a PNG of the Flye assembly graph with Bandage.",
+          "help_text": "Runs directly off the Flye GFA, so it's unaffected by --enable_medaka (Medaka polishes sequence, not graph topology)."
+        },
+        "bandage_height": {
+          "type": "integer",
+          "default": 1000,
+          "minimum": 1,
+          "description": "Output image height in pixels (width is scaled automatically)."
+        }
+      }
+    },
     "polishing": {
       "title": "Polishing",
       "type": "object",
@@ -156,6 +175,7 @@
     { "$ref": "#/$defs/input_output_options" },
     { "$ref": "#/$defs/read_filtering" },
     { "$ref": "#/$defs/assembly" },
+    { "$ref": "#/$defs/assembly_graph_image" },
     { "$ref": "#/$defs/polishing" },
     { "$ref": "#/$defs/annotation" },
     { "$ref": "#/$defs/quality_control" },

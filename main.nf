@@ -33,6 +33,7 @@ def helpMessage() {
 
     Key optional toggles (all default to the ulana-ht Snakemake defaults):
       --enable_medaka     polish the Flye assembly with Medaka (default ${params.enable_medaka})
+      --enable_bandage    render a PNG of the Flye assembly graph (default ${params.enable_bandage})
       --enable_prokka     annotate with Prokka (default ${params.enable_prokka})
       --enable_checkm     QC with CheckM (default ${params.enable_checkm})
       --enable_id_genes   extract 16S/dnaA/rpoB from Prokka output, requires --enable_prokka (default ${params.enable_id_genes})

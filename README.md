@@ -11,17 +11,21 @@ detection (the same steps and feature toggles as the Snakemake/RShiny original).
 1. `MERGE_FASTQ` -- merge multi-part fastq(.gz) files per sample
 2. `CHOPPER` -- quality + length filtering
 3. `FLYE_ASSEMBLY` -- assembly
-4. `MEDAKA_POLISH` -- polish (optional, default on)
-5. `PROKKA` -- annotate (optional, default on)
-6. `CHECKM` -- QC (optional, default on)
-7. `IDENTIFIER_GENES` -- extract 16S rRNA / dnaA / rpoB from Prokka output (optional, default on; requires Prokka)
-8. `AMRFINDER_DB` + `AMRFINDER` -- AMR detection (optional, default on; requires Prokka)
+4. `BANDAGE_IMAGE` -- render a PNG of the Flye assembly graph (optional, default on)
+5. `MEDAKA_POLISH` -- polish (optional, default on)
+6. `PROKKA` -- annotate (optional, default on)
+7. `CHECKM` -- QC (optional, default on)
+8. `IDENTIFIER_GENES` -- extract 16S rRNA / dnaA / rpoB from Prokka output (optional, default on; requires Prokka)
+9. `AMRFINDER_DB` + `AMRFINDER` -- AMR detection (optional, default on; requires Prokka)
 
 ```mermaid
 flowchart TD
   A["samplesheet.csv<br/>sample,fastq"] --> B[MERGE_FASTQ]
   B --> C[CHOPPER]
   C --> D[FLYE_ASSEMBLY]
+
+  D --> D2{enable_bandage?}
+  D2 -->|yes| D3[BANDAGE_IMAGE]
 
   D --> E{enable_medaka?}
   E -->|yes| F[MEDAKA_POLISH]
@@ -74,6 +78,7 @@ run `nextflow run main.nf --help`. Key ones:
 | `--outdir` | `results` | Output directory |
 | `--chopper_q` / `--chopper_minlength` | `10` / `1000` | chopper quality/length filtering |
 | `--flye_mode` | `--nano-hq` | Flye read-type flag |
+| `--enable_bandage` / `--bandage_height` | `true` / `1000` | Render a PNG of the Flye assembly graph |
 | `--enable_medaka` / `--medaka_model` | `true` / `r1041_e82_400bps_hac_v5.0.0` | Medaka polishing |
 | `--enable_prokka` | `true` | Prokka annotation |
 | `--enable_checkm` | `true` | CheckM QC |
@@ -86,7 +91,7 @@ run `nextflow run main.nf --help`. Key ones:
 results/
   {sample}/
     reads/            merged + filtered fastq
-    assembly/flye/    assembly.fasta, assembly_info.txt, assembly_graph.gfa
+    assembly/flye/    assembly.fasta, assembly_info.txt, assembly_graph.gfa, assembly_graph.png (only if --enable_bandage)
     polish/medaka/    polished_consensus.fasta (only if --enable_medaka)
     annotation/prokka/  .tsv .faa .ffn .gff (only if --enable_prokka)
     qc/checkm/        summary.tsv (only if --enable_checkm)

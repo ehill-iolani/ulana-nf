@@ -1,6 +1,7 @@
 include { MERGE_FASTQ      } from '../modules/merge_fastq.nf'
 include { CHOPPER          } from '../modules/chopper.nf'
 include { FLYE_ASSEMBLY    } from '../modules/flye.nf'
+include { BANDAGE_IMAGE    } from '../modules/bandage_image.nf'
 include { MEDAKA_POLISH    } from '../modules/medaka.nf'
 include { PROKKA           } from '../modules/prokka.nf'
 include { CHECKM_DB        } from '../modules/checkm_db.nf'
@@ -23,6 +24,14 @@ workflow ULANA_WGS {
 
     // 3. assemble
     FLYE_ASSEMBLY(CHOPPER.out.filtered)
+
+    // 3b. render the assembly graph -- optional, visualizes the Flye GFA
+    // directly (unaffected by Medaka, which only polishes the sequence, not
+    // the graph, so this always runs off FLYE_ASSEMBLY's output regardless
+    // of --enable_medaka)
+    if (params.enable_bandage) {
+        BANDAGE_IMAGE(FLYE_ASSEMBLY.out.gfa)
+    }
 
     // 4. polish -- optional; downstream steps consume whichever of these is current
     if (params.enable_medaka) {
