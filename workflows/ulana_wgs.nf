@@ -1,5 +1,6 @@
 include { MERGE_FASTQ      } from '../modules/merge_fastq.nf'
 include { CHOPPER          } from '../modules/chopper.nf'
+include { READ_STATS; READ_STATS_REPORT } from '../modules/read_stats.nf'
 include { FLYE_ASSEMBLY    } from '../modules/flye.nf'
 include { BANDAGE_IMAGE    } from '../modules/bandage_image.nf'
 include { MEDAKA_POLISH    } from '../modules/medaka.nf'
@@ -21,6 +22,16 @@ workflow ULANA_WGS {
 
     // 2. quality + length filter
     CHOPPER(MERGE_FASTQ.out.merged)
+
+    // 2b. read length / Q-score summary, before vs. after filtering -- a
+    // side branch, nothing downstream depends on it
+    if (params.enable_read_stats) {
+        READ_STATS(MERGE_FASTQ.out.merged.join(CHOPPER.out.filtered))
+        READ_STATS_REPORT(
+            READ_STATS.out.stats.map { sample, stats, hist -> stats }.collect(),
+            READ_STATS.out.stats.map { sample, stats, hist -> hist }.collect()
+        )
+    }
 
     // 3. assemble
     FLYE_ASSEMBLY(CHOPPER.out.filtered)

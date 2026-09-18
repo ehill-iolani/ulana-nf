@@ -44,6 +44,12 @@
           "default": 1000,
           "minimum": 1,
           "description": "Minimum read length."
+        },
+        "enable_read_stats": {
+          "type": "boolean",
+          "default": true,
+          "description": "Summarize read length and Q-score before vs. after filtering.",
+          "help_text": "Writes read_qc_summary.html, read_stats.tsv and read_length_qscore_hist.tsv to read_qc/. Purely informational -- nothing downstream depends on it."
         }
       }
     },

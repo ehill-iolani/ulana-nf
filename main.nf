@@ -11,6 +11,8 @@ nextflow.enable.dsl = 2
 
 include { ULANA_WGS   } from './workflows/ulana_wgs.nf'
 include { MERGE_FASTQ } from './modules/merge_fastq.nf'
+include { CHOPPER     } from './modules/chopper.nf'
+include { READ_STATS; READ_STATS_REPORT } from './modules/read_stats.nf'
 
 // ---- top-level params (override via -params-file or --flag) ----
 // tool params (chopper_q, flye_mode, medaka_model, ...) and the enable_*
@@ -32,6 +34,7 @@ def helpMessage() {
       --input       CSV: sample,fastq_path (fastq may be a single file or a glob)
 
     Key optional toggles (all default to the ulana-ht Snakemake defaults):
+      --enable_read_stats read length/Q-score summary before vs. after filtering (default ${params.enable_read_stats})
       --enable_medaka     polish the Flye assembly with Medaka (default ${params.enable_medaka})
       --enable_bandage    render a PNG of the Flye assembly graph (default ${params.enable_bandage})
       --enable_prokka     annotate with Prokka (default ${params.enable_prokka})
@@ -81,4 +84,22 @@ workflow MERGE_ONLY {
         exit 1
     }
     MERGE_FASTQ(samplesheetToChannel(params.input))
+}
+
+// Read QC only: merge -> chopper -> before/after length & Q-score summary, no
+// assembly. Handy for picking --chopper_q/--chopper_minlength before
+// committing to a full run:
+//   nextflow run main.nf -entry READ_QC_ONLY --input samplesheet.csv --chopper_q 12 -profile docker
+workflow READ_QC_ONLY {
+    if (!params.input) {
+        log.error "READ_QC_ONLY requires --input samplesheet.csv"
+        exit 1
+    }
+    MERGE_FASTQ(samplesheetToChannel(params.input))
+    CHOPPER(MERGE_FASTQ.out.merged)
+    READ_STATS(MERGE_FASTQ.out.merged.join(CHOPPER.out.filtered))
+    READ_STATS_REPORT(
+        READ_STATS.out.stats.map { sample, stats, hist -> stats }.collect(),
+        READ_STATS.out.stats.map { sample, stats, hist -> hist }.collect()
+    )
 }

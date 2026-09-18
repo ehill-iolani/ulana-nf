@@ -10,6 +10,7 @@ detection (the same steps and feature toggles as the Snakemake/RShiny original).
 
 1. `MERGE_FASTQ` -- merge multi-part fastq(.gz) files per sample
 2. `CHOPPER` -- quality + length filtering
+   - `READ_STATS` (side branch, `--enable_read_stats`, on by default) -- read length and mean Q-score before vs. after filtering
 3. `FLYE_ASSEMBLY` -- assembly
 4. `BANDAGE_IMAGE` -- render a PNG of the Flye assembly graph (optional, default on)
 5. `MEDAKA_POLISH` -- polish (optional, default on)
@@ -22,6 +23,9 @@ detection (the same steps and feature toggles as the Snakemake/RShiny original).
 flowchart TD
   A["samplesheet.csv<br/>sample,fastq"] --> B[MERGE_FASTQ]
   B --> C[CHOPPER]
+  B --> R1{enable_read_stats?}
+  C --> R1
+  R1 -->|yes| R2[READ_STATS]
   C --> D[FLYE_ASSEMBLY]
 
   D --> D2{enable_bandage?}
@@ -77,6 +81,7 @@ run `nextflow run main.nf --help`. Key ones:
 | `--input` | *(required)* | Samplesheet CSV (`sample,fastq`) |
 | `--outdir` | `results` | Output directory |
 | `--chopper_q` / `--chopper_minlength` | `10` / `1000` | chopper quality/length filtering |
+| `--enable_read_stats` | `true` | Read length/Q-score summary before vs. after filtering |
 | `--flye_mode` | `--nano-hq` | Flye read-type flag |
 | `--enable_bandage` / `--bandage_height` | `true` / `1000` | Render a PNG of the Flye assembly graph |
 | `--enable_medaka` / `--medaka_model` | `true` / `r1041_e82_400bps_hac_v5.0.0` | Medaka polishing |
@@ -97,6 +102,7 @@ results/
     qc/checkm/        summary.tsv (only if --enable_checkm)
     id_genes/         16S_rRNA.fasta, dnaA.fasta, rpoB.fasta (only if --enable_id_genes)
     amr/              amrfinder_pro_results.tsv, amrfinder_pro.fasta (only if --enable_amrfinder)
+  read_qc/            read_qc_summary.html, read_stats.tsv, read_length_qscore_hist.tsv (only if --enable_read_stats)
   db/amrfinder_db/    AMRFinderPlus database for this run
   pipeline_info/       Nextflow timeline/report/trace
 ```
@@ -107,6 +113,7 @@ results/
 main.nf                     entry point, samplesheet parsing, --help
 workflows/ulana_wgs.nf       subworkflow chaining all steps
 modules/*.nf                 one process per tool, one container each
+bin/read_stats.py            read length/Q-score summary (stdlib only; also runs stand-alone)
 nextflow.config               param defaults, profiles, resource labels
 nextflow_schema.json          JSON Schema describing every --param (for UIs/validation tooling)
 conf/test.config              -profile test overrides (small synthetic dataset)
