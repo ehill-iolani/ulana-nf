@@ -19,6 +19,6 @@ process IDENTIFIER_GENES {
     awk '/Chromosomal replication initiator protein DnaA/{flag=1;next}/^>/{flag=0}flag' ${ffn} >> dnaA.fasta
 
     echo '>DNA-directed RNA polymerase subunit beta' > rpoB.fasta
-    awk '/DNA-directed RNA polymerase subunit beta/{flag=1;next}/^>/{flag=0}flag' ${ffn} >> rpoB.fasta
+    awk '/DNA-directed RNA polymerase subunit beta[[:space:]]*\$/{flag=1;next}/^>/{flag=0}flag' ${ffn} >> rpoB.fasta
     """
 }
