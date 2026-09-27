@@ -25,12 +25,17 @@ process CHECKM {
     // a single file path, so it has to be staged into its own bin/ dir first.
     // `data setRoot` has to be re-run against CHECKM_DB's published directory
     // in every task -- each task starts from a fresh container, so nothing
-    // from a prior `setRoot` call persists between tasks
+    // from a prior `setRoot` call persists between tasks.
+    // The db is copied (-L: dereference Nextflow's staging symlink) to task-local
+    // disk first: on Google Batch the staged input is a gcsfuse-backed path, and
+    // setRoot rewrites the db's manifest in place, which fails there with
+    // "OSError: [Errno 116] Stale file handle"
     """
     mkdir -p bin
     cp ${assembly} bin/${sample}.fasta
 
-    checkm data setRoot ${checkm_db}
+    cp -rL ${checkm_db} checkm_data_local
+    checkm data setRoot checkm_data_local
     checkm lineage_wf --reduced_tree -t ${task.cpus} -x fasta bin .
     checkm qa -o 2 --tab_table -t ${task.cpus} -f summary.tsv lineage.ms .
     """
