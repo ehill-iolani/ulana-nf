@@ -1,6 +1,6 @@
 process AMRFINDER_DB {
     label 'process_low'
-    container 'quay.io/biocontainers/ncbi-amrfinderplus:4.2.7--hf69ffd2_0'
+    container "${params.container_registry}/biocontainers/ncbi-amrfinderplus:4.2.7--hf69ffd2_0"
     publishDir "${params.outdir}/db", mode: 'copy'
 
     output:

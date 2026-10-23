@@ -9,7 +9,7 @@ process MEDAKA_POLISH {
     // list tops out at v4.3.0 and rejects the v5.0.0 default model this
     // pipeline uses (matching ulana-ht's config.yaml); this digest is
     // medaka 2.2.1, which knows v5.0.0.
-    container 'ontresearch/medaka:shaf39439188c323053e66cf79618fae1ab33d1b38a'
+    container "${params.dockerhub_registry}/ontresearch/medaka:shaf39439188c323053e66cf79618fae1ab33d1b38a"
     publishDir(path: { "${params.outdir}/${sample}/polish/medaka" }, mode: 'copy')
 
     input:

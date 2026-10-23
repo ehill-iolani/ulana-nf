@@ -1,7 +1,7 @@
 process MERGE_FASTQ {
     tag "$sample"
     label 'process_low'
-    container 'ubuntu:22.04'
+    container "${params.dockerhub_registry}/library/ubuntu:22.04"
     publishDir(path: { "${params.outdir}/${sample}/reads" }, mode: 'copy')
 
     input:

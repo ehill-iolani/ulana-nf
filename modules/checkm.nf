@@ -10,7 +10,7 @@ process CHECKM {
     // cpus   = 4
     // memory = '16.GB'
     // time   = '4.h'
-    container 'quay.io/biocontainers/checkm-genome:1.2.2--pyhdfd78af_1'
+    container "${params.container_registry}/biocontainers/checkm-genome:1.2.2--pyhdfd78af_1"
     publishDir(path: { "${params.outdir}/${sample}/qc/checkm" }, mode: 'copy')
 
     input:

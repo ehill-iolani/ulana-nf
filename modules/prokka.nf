@@ -1,7 +1,7 @@
 process PROKKA {
     tag "$sample"
     label 'process_medium'
-    container 'quay.io/biocontainers/prokka:1.14.6--pl5321hdfd78af_4'
+    container "${params.container_registry}/biocontainers/prokka:1.14.6--pl5321hdfd78af_4"
     publishDir(path: { "${params.outdir}/${sample}/annotation/prokka" }, mode: 'copy')
 
     input:

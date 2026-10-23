@@ -1,7 +1,7 @@
 process AMRFINDER {
     tag "$sample"
     label 'process_medium'
-    container 'quay.io/biocontainers/ncbi-amrfinderplus:4.2.7--hf69ffd2_0'
+    container "${params.container_registry}/biocontainers/ncbi-amrfinderplus:4.2.7--hf69ffd2_0"
     publishDir(path: { "${params.outdir}/${sample}/amr" }, mode: 'copy')
 
     input:

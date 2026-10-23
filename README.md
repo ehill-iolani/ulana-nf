@@ -89,6 +89,7 @@ run `nextflow run main.nf --help`. Key ones:
 | `--enable_checkm` | `true` | CheckM QC |
 | `--enable_id_genes` | `true` | Marker gene extraction (requires `--enable_prokka`) |
 | `--enable_amrfinder` | `true` | AMRFinderPlus AMR detection (requires `--enable_prokka`); DB is downloaded fresh every run |
+| `--container_registry` / `--dockerhub_registry` | `quay.io` / `docker.io` | Registries the tool images are pulled from. The `google_batch` profile points both at the project's Artifact Registry mirror (see [Container mirror](#container-mirror)); pass the defaults to pull from upstream |
 
 ## Output layout
 
@@ -118,8 +119,33 @@ nextflow.config               param defaults, profiles, resource labels
 nextflow_schema.json          JSON Schema describing every --param (for UIs/validation tooling)
 conf/test.config              -profile test overrides (small synthetic dataset)
 tests/data/                   small synthetic dataset used by -profile test
+scripts/mirror_images.sh      copies the pipeline's container images into our Artifact Registry (see Container mirror)
 .github/workflows/ci.yml      runs -profile test on push/PR
 ```
+
+## Container mirror
+
+On Google Batch every task starts on a fresh VM and pulls its image, so one
+timed-out pull from quay.io or Docker Hub can end a long run. The
+`google_batch` profile therefore pulls from our own Artifact Registry repo
+(`us-central1-docker.pkg.dev/iscc-400300/containers`), which keeps each
+image's upstream path (`biocontainers/flye:...`, `ontresearch/medaka:...`,
+`library/ubuntu:...`) so only the registry host differs. The repo is shared
+with the other pipelines; images they also use (same tags) are already there.
+
+`scripts/mirror_images.sh` fills it. It reads the image list from the
+pipeline's own `container` directives, so it can't drift:
+
+```bash
+gcloud auth configure-docker us-central1-docker.pkg.dev   # once, for pushing
+scripts/mirror_images.sh --check     # read-only: is every image there, same digest as upstream?
+scripts/mirror_images.sh             # copy whatever is missing
+```
+
+Run it again whenever an image tag is added or changed, and before releasing
+(`--check` exits 1 if anything is missing). Every `container` must go through
+`${params.container_registry}` or `${params.dockerhub_registry}`; the script
+refuses to run if one doesn't, since it would silently bypass the mirror.
 
 ## Testing
 

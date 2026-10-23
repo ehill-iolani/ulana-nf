@@ -1,7 +1,7 @@
 process BANDAGE_IMAGE {
     tag "$sample"
     label 'process_low'
-    container 'quay.io/biocontainers/bandage:0.9.0--h9948957_0'
+    container "${params.container_registry}/biocontainers/bandage:0.9.0--h9948957_0"
     publishDir(path: { "${params.outdir}/${sample}/assembly/flye" }, mode: 'copy')
 
     input:

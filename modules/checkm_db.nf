@@ -1,6 +1,6 @@
 process CHECKM_DB {
     label 'process_low'
-    container 'quay.io/biocontainers/checkm-genome:1.2.2--pyhdfd78af_1'
+    container "${params.container_registry}/biocontainers/checkm-genome:1.2.2--pyhdfd78af_1"
     publishDir "${params.outdir}/db", mode: 'copy'
 
     output:

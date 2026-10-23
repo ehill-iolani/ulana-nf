@@ -1,7 +1,7 @@
 process IDENTIFIER_GENES {
     tag "$sample"
     label 'process_low'
-    container 'ubuntu:22.04'
+    container "${params.dockerhub_registry}/library/ubuntu:22.04"
     publishDir(path: { "${params.outdir}/${sample}/id_genes" }, mode: 'copy')
 
     input:

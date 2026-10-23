@@ -1,7 +1,7 @@
 process FLYE_ASSEMBLY {
     tag "$sample"
     label 'process_high'
-    container 'quay.io/biocontainers/flye:2.9.6--py312h734f728_1'
+    container "${params.container_registry}/biocontainers/flye:2.9.6--py312h734f728_1"
     publishDir(path: { "${params.outdir}/${sample}/assembly/flye" }, mode: 'copy')
 
     input:
