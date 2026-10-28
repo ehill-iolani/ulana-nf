@@ -18,6 +18,7 @@ detection (the same steps and feature toggles as the Snakemake/RShiny original).
 7. `CHECKM` -- QC (optional, default on)
 8. `IDENTIFIER_GENES` -- extract 16S rRNA / dnaA / rpoB from Prokka output (optional, default on; requires Prokka)
 9. `AMRFINDER_DB` + `AMRFINDER` -- AMR detection (optional, default on; requires Prokka)
+10. `GENBANK_PREP` + `TABLE2ASN` -- GenBank submission files (optional, default off; requires Prokka and the samplesheet's organism/locus_tag columns, see [GenBank submission](#genbank-submission))
 
 ```mermaid
 flowchart TD
@@ -49,6 +50,9 @@ flowchart TD
   J --> O{enable_amrfinder?}
   O -->|yes| P[AMRFINDER_DB] --> Q[AMRFINDER]
   J --> Q
+
+  J --> S{enable_genbank?}
+  S -->|yes| T[GENBANK_PREP] --> U[TABLE2ASN]
 ```
 
 ## Requirements
@@ -71,6 +75,17 @@ sample,fastq
 18-T-HS-3-S-2-30-S,data/18-T-HS-3-S-2-30-S_ONT.fastq.gz
 ```
 
+With `--enable_genbank` it also needs `organism` and `locus_tag` columns
+(`strain` is optional, except for a `Genus sp.` organism):
+
+```csv
+sample,fastq,organism,strain,locus_tag
+25-KEA-6,data/25-KEA-6_combined.fastq.gz,Pseudomonas sp.,KEA-6,KEAT
+```
+
+A damaged `.fastq.gz` part stops the run at `MERGE_FASTQ` with the sample
+and file named, rather than silently losing every read after it.
+
 ## Parameters
 
 See `nextflow_schema.json` for the full list with defaults and validation, or
@@ -89,6 +104,8 @@ run `nextflow run main.nf --help`. Key ones:
 | `--enable_checkm` | `true` | CheckM QC |
 | `--enable_id_genes` | `true` | Marker gene extraction (requires `--enable_prokka`) |
 | `--enable_amrfinder` | `true` | AMRFinderPlus AMR detection (requires `--enable_prokka`); DB is downloaded fresh every run |
+| `--enable_genbank` | `false` | GenBank submission files (requires `--enable_prokka` and the samplesheet's `organism` + `locus_tag` columns) |
+| `--genbank_template` | *(none)* | NCBI submitter template (`.sbt`) to build into the `.sqn` |
 | `--container_registry` / `--dockerhub_registry` | `quay.io` / `docker.io` | Registries the tool images are pulled from. The `google_batch` profile points both at the project's Artifact Registry mirror (see [Container mirror](#container-mirror)); pass the defaults to pull from upstream |
 
 ## Output layout
@@ -101,8 +118,9 @@ results/
     polish/medaka/    polished_consensus.fasta (only if --enable_medaka)
     annotation/prokka/  .tsv .faa .ffn .gff (only if --enable_prokka)
     qc/checkm/        summary.tsv (only if --enable_checkm)
-    id_genes/         16S_rRNA.fasta, dnaA.fasta, rpoB.fasta (only if --enable_id_genes)
+    id_genes/         16S_rRNA.fasta, dnaA.fasta, rpoB.fasta, one record per gene copy (only if --enable_id_genes)
     amr/              amrfinder_pro_results.tsv, amrfinder_pro.fasta (only if --enable_amrfinder)
+    genbank/          {sample}.sqn .fsa .tbl .cmt .gbf .val .stats .dr, submission_info.txt (only if --enable_genbank)
   read_qc/            read_qc_summary.html, read_stats.tsv, read_length_qscore_hist.tsv (only if --enable_read_stats)
   db/amrfinder_db/    AMRFinderPlus database for this run
   pipeline_info/       Nextflow timeline/report/trace
@@ -115,6 +133,8 @@ main.nf                     entry point, samplesheet parsing, --help
 workflows/ulana_wgs.nf       subworkflow chaining all steps
 modules/*.nf                 one process per tool, one container each
 bin/read_stats.py            read length/Q-score summary (stdlib only; also runs stand-alone)
+bin/pick_genes.sh            pulls the identifier genes out of Prokka's .ffn, one record per copy
+bin/genbank_prep.py          Prokka .fsa/.tbl -> GenBank-ready files (stdlib only; also runs stand-alone)
 nextflow.config               param defaults, profiles, resource labels
 nextflow_schema.json          JSON Schema describing every --param (for UIs/validation tooling)
 conf/test.config              -profile test overrides (small synthetic dataset)
@@ -122,6 +142,41 @@ tests/data/                   small synthetic dataset used by -profile test
 scripts/mirror_images.sh      copies the pipeline's container images into our Artifact Registry (see Container mirror)
 .github/workflows/ci.yml      runs -profile test on push/PR
 ```
+
+## GenBank submission
+
+`--enable_genbank` turns the Prokka annotation into the files for a GenBank
+genome submission. The fiddly part of submitting is getting NCBI's validator
+to accept the annotation, so the pipeline does that and runs NCBI's own checks:
+
+1. Register a BioProject and BioSample at NCBI first. The locus tag prefix
+   comes from there and goes in the samplesheet's `locus_tag` column, along
+   with `organism` (and `strain`). Prokka then names genes `KEAT_00001`, ...
+2. Optionally make a submitter template (`.sbt`) with
+   [NCBI's form](https://submit.ncbi.nlm.nih.gov/genbank/template/submission/)
+   and pass it with `--genbank_template`. Without one the `.sqn` has no
+   submitter or citation, and the validation report lists that as its two errors.
+3. `GENBANK_PREP` (`bin/genbank_prep.py`) fixes what the validator rejects in
+   Prokka's output:
+   - adds a `gene` feature per CDS/RNA and a `protein_id` per CDS;
+   - renames "putative protein" and the like to "hypothetical protein";
+   - removes EC numbers and gene names from hypothetical proteins;
+   - removes Prokka's `_1`/`_2` gene-name suffixes;
+   - drops barrnap's partial rRNA fragments and contigs under 200 bp;
+   - puts the strain into a `Genus sp.` organism name;
+   - marks contigs Flye closed as circular;
+   - writes NCBI's Genome-Assembly-Data comment (assembly method, coverage,
+     sequencing technology).
+   Prokka's own outputs in `annotation/prokka/` are unchanged.
+4. `TABLE2ASN` builds `{sample}.sqn` (the file to upload) and
+   `{sample}.gbf` (the GenBank record, to read before sending), and runs
+   NCBI's validation (`.val`, counts in `.stats`) and discrepancy report (`.dr`).
+
+`submission_info.txt` lists what was changed and the values NCBI's Genome
+Submission Portal asks for. Fix every `ERROR` in the `.val` and every `FATAL`
+in the `.dr` before submitting. On a real 5.5 Mb Pseudomonas assembly with a
+template, the result had no errors or FATALs, only warnings NCBI accepts
+(UniProt product names ending in a bracket, a circular contig not flagged complete).
 
 ## Container mirror
 

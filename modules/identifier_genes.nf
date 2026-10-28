@@ -11,14 +11,12 @@ process IDENTIFIER_GENES {
     tuple val(sample), path("16S_rRNA.fasta"), path("dnaA.fasta"), path("rpoB.fasta"), emit: genes
 
     script:
+    // one record per gene copy (see bin/pick_genes.sh). The rpoB pattern is
+    // anchored at the end so it doesn't also match rpoC ("... subunit beta'");
+    // the 16S one also takes Prokka's "16S ribosomal RNA (partial)"
     """
-    echo '>16S ribosomal RNA' > 16S_rRNA.fasta
-    awk '/16S ribosomal RNA/{flag=1;next}/^>/{flag=0}flag' ${ffn} >> 16S_rRNA.fasta
-
-    echo '>Chromosomal replication initiator protein DnaA' > dnaA.fasta
-    awk '/Chromosomal replication initiator protein DnaA/{flag=1;next}/^>/{flag=0}flag' ${ffn} >> dnaA.fasta
-
-    echo '>DNA-directed RNA polymerase subunit beta' > rpoB.fasta
-    awk '/DNA-directed RNA polymerase subunit beta[[:space:]]*\$/{flag=1;next}/^>/{flag=0}flag' ${ffn} >> rpoB.fasta
+    pick_genes.sh ${ffn} '^16S ribosomal RNA' '16S ribosomal RNA' 16S_rRNA.fasta
+    pick_genes.sh ${ffn} '^Chromosomal replication initiator protein DnaA[[:space:]]*\$' 'Chromosomal replication initiator protein DnaA' dnaA.fasta
+    pick_genes.sh ${ffn} '^DNA-directed RNA polymerase subunit beta[[:space:]]*\$' 'DNA-directed RNA polymerase subunit beta' rpoB.fasta
     """
 }

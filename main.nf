@@ -19,7 +19,7 @@ include { READ_STATS; READ_STATS_REPORT } from './modules/read_stats.nf'
 // toggles all live in nextflow.config, not here -- anything read directly
 // inside an included module or workflow script must be set there to be
 // reliably visible by the time that module/workflow script runs
-params.input  = null   // path to samplesheet.csv (sample,fastq); fastq globs resolve relative to the launch dir, not the CSV's location
+params.input  = null   // path to samplesheet.csv (sample,fastq[,organism,strain,locus_tag]); fastq globs resolve relative to the launch dir, not the CSV's location
 params.outdir = "results"
 params.help   = false
 
@@ -31,7 +31,8 @@ def helpMessage() {
       nextflow run main.nf --input samplesheet.csv --outdir results
 
     Required:
-      --input       CSV: sample,fastq_path (fastq may be a single file or a glob)
+      --input       CSV: sample,fastq_path (fastq may be a single file or a glob), plus
+                    organism,strain,locus_tag for --enable_genbank
 
     Key optional toggles (all default to the ulana-ht Snakemake defaults):
       --enable_read_stats read length/Q-score summary before vs. after filtering (default ${params.enable_read_stats})
@@ -41,6 +42,9 @@ def helpMessage() {
       --enable_checkm     QC with CheckM (default ${params.enable_checkm})
       --enable_id_genes   extract 16S/dnaA/rpoB from Prokka output, requires --enable_prokka (default ${params.enable_id_genes})
       --enable_amrfinder  AMR detection with AMRFinderPlus, requires --enable_prokka (default ${params.enable_amrfinder})
+      --enable_genbank    GenBank submission files (.sqn, feature table, validation report), requires --enable_prokka
+                          and organism + locus_tag samplesheet columns (default ${params.enable_genbank})
+      --genbank_template  NCBI submission template (.sbt) to build into the .sqn (optional)
 
     Key tool params:
       --chopper_q / --chopper_minlength   chopper quality/length filtering (default ${params.chopper_q} / ${params.chopper_minlength})
@@ -67,13 +71,57 @@ def samplesheetToChannel(path) {
         }
 }
 
+// The optional organism,strain,locus_tag columns, as tuple(sample, meta map).
+// They're only read with --enable_genbank, and then organism and locus_tag
+// are required: NCBI rejects a record without them, so fail here rather than
+// after hours of assembly
+def samplesheetMeta(path) {
+    // allowlist, since the values go into Prokka's command line and into the
+    // [key=value] modifiers of the GenBank FASTA headers
+    def safe = /^[A-Za-z0-9 .\-_\/():,+#]+$/
+    Channel
+        .fromPath(path, checkIfExists: true)
+        .splitCsv(header: true)
+        .map { row ->
+            def meta = [
+                organism : (row.organism ?: '').trim(),
+                strain   : (row.strain ?: '').trim(),
+                locus_tag: (row.locus_tag ?: '').trim(),
+            ]
+            if (params.enable_genbank) {
+                def where = "Samplesheet row '${row.sample}'"
+                if (!meta.organism) {
+                    error "${where}: --enable_genbank needs an organism column (e.g. 'Pseudomonas aeruginosa', or 'Pseudomonas sp.' if the species isn't known)"
+                }
+                if (meta.organism.split(/\s+/).size() < 2) {
+                    error "${where}: organism '${meta.organism}' needs a genus and a species, e.g. '${meta.organism} sp.' if the species isn't known"
+                }
+                if (!(meta.organism ==~ safe) || (meta.strain && !(meta.strain ==~ safe))) {
+                    error "${where}: organism and strain may only use letters, digits, spaces and . - _ / ( ) : , + #"
+                }
+                // NCBI names an unnamed species by its strain ("Pseudomonas sp. KEA-6")
+                if (meta.organism.endsWith(' sp.') && !meta.strain) {
+                    error "${where}: organism '${meta.organism}' needs a strain column, since NCBI names an unidentified species by its strain"
+                }
+                if (!meta.locus_tag) {
+                    error "${where}: --enable_genbank needs a locus_tag column, the prefix NCBI assigns when you register the BioSample"
+                }
+                // NCBI's rule for locus tag prefixes
+                if (!(meta.locus_tag ==~ /^[A-Za-z][A-Za-z0-9]{2,11}$/)) {
+                    error "${where}: locus_tag '${meta.locus_tag}' isn't a valid NCBI prefix (3-12 letters and digits, starting with a letter, no underscore)"
+                }
+            }
+            tuple(row.sample, meta)
+        }
+}
+
 workflow {
     if (params.help || !params.input) {
         helpMessage()
         exit 0
     }
 
-    ULANA_WGS(samplesheetToChannel(params.input))
+    ULANA_WGS(samplesheetToChannel(params.input), samplesheetMeta(params.input))
 }
 
 // dev/debug entry point -- run just the merge step in isolation, e.g.:

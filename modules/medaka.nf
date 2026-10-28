@@ -10,17 +10,21 @@ process MEDAKA_POLISH {
     // pipeline uses (matching ulana-ht's config.yaml); this digest is
     // medaka 2.2.1, which knows v5.0.0.
     container "${params.dockerhub_registry}/ontresearch/medaka:shaf39439188c323053e66cf79618fae1ab33d1b38a"
-    publishDir(path: { "${params.outdir}/${sample}/polish/medaka" }, mode: 'copy')
+    // the .version is for the GenBank assembly comment, not a result
+    publishDir(path: { "${params.outdir}/${sample}/polish/medaka" }, mode: 'copy', saveAs: { it.endsWith('.version') ? null : it })
 
     input:
     tuple val(sample), path(reads), path(draft)
 
     output:
     tuple val(sample), path("polished_consensus.fasta"), emit: polished
+    tuple val(sample), path("medaka.version"), emit: version
 
     script:
     """
     medaka_consensus -i ${reads} -d ${draft} -o medaka_out -t ${task.cpus} -m ${params.medaka_model}
     medaka sequence medaka_out/*.hdf ${draft} polished_consensus.fasta
+    # "medaka 2.2.1" -> "2.2.1"
+    medaka --version 2>&1 | awk '{ print \$NF }' > medaka.version
     """
 }

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft-07/schema",
   "$id": "https://raw.githubusercontent.com/ehill-iolani/ulana-nf/main/nextflow_schema.json",
   "title": "ulana-nf pipeline parameters",
-  "description": "Bacterial whole-genome assembly and characterization from Oxford Nanopore long reads: Flye assembly, optional Medaka polishing, Prokka annotation, CheckM QC, marker-gene extraction, and AMRFinderPlus AMR detection.",
+  "description": "Bacterial whole-genome assembly and characterization from Oxford Nanopore long reads: Flye assembly, optional Medaka polishing, Prokka annotation, CheckM QC, marker-gene extraction, and AMRFinderPlus AMR detection, with optional GenBank submission files.",
   "type": "object",
   "$defs": {
     "input_output_options": {
@@ -17,8 +17,8 @@
           "exists": true,
           "mimetype": "text/csv",
           "pattern": "^\\S+\\.csv$",
-          "description": "Samplesheet CSV with two columns: sample,fastq.",
-          "help_text": "Each row maps a sample name to a fastq(.gz) file or glob. A glob may match multiple part-files -- they're merged into one file per sample before filtering. Glob paths resolve relative to the launch directory, not the samplesheet's own location."
+          "description": "Samplesheet CSV with columns sample,fastq, plus organism,strain,locus_tag for GenBank submission files.",
+          "help_text": "Each row maps a sample name to a fastq(.gz) file or glob. A glob may match multiple part-files -- they're merged into one file per sample before filtering. Glob paths resolve relative to the launch directory, not the samplesheet's own location. The organism, strain and locus_tag columns are only read with --enable_genbank, which needs organism (genus and species, or 'Genus sp.' with a strain) and locus_tag (the prefix NCBI assigns when the BioSample is registered) on every row."
         },
         "outdir": {
           "type": "string",
@@ -156,6 +156,27 @@
         }
       }
     },
+    "genbank_submission": {
+      "title": "GenBank submission",
+      "type": "object",
+      "description": "Files for submitting the annotated genome to GenBank.",
+      "properties": {
+        "enable_genbank": {
+          "type": "boolean",
+          "default": false,
+          "description": "Prepare GenBank submission files from the Prokka annotation.",
+          "help_text": "Requires --enable_prokka and the samplesheet's organism and locus_tag columns. Fixes what NCBI's validator rejects in Prokka's output, then runs table2asn to build the .sqn to upload, a GenBank flatfile to read it in, and NCBI's validation and discrepancy reports. Writes genbank/ per sample; submission_info.txt lists what changed and what to enter in NCBI's Genome Submission Portal."
+        },
+        "genbank_template": {
+          "type": "string",
+          "format": "file-path",
+          "exists": true,
+          "pattern": "^\\S+\\.sbt$",
+          "description": "NCBI submission template (.sbt) with the submitter and authors.",
+          "help_text": "Made with NCBI's form at https://submit.ncbi.nlm.nih.gov/genbank/template/submission/. Optional: without it the .sqn has no submitter or citation, and the validation report lists that as its two errors."
+        }
+      }
+    },
     "generic_options": {
       "title": "Generic options",
       "type": "object",
@@ -208,6 +229,7 @@
     { "$ref": "#/$defs/quality_control" },
     { "$ref": "#/$defs/identifier_genes" },
     { "$ref": "#/$defs/amr_detection" },
+    { "$ref": "#/$defs/genbank_submission" },
     { "$ref": "#/$defs/generic_options" },
     { "$ref": "#/$defs/container_images" }
   ]
