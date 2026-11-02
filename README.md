@@ -83,6 +83,9 @@ sample,fastq,organism,strain,locus_tag
 25-KEA-6,data/25-KEA-6_combined.fastq.gz,Pseudomonas sp.,KEA-6,KEAT
 ```
 
+Each row needs its own `sample` name (compared ignoring case): two rows with
+the same name stop the run at launch.
+
 A damaged `.fastq.gz` part stops the run at `MERGE_FASTQ` with the sample
 and file named, rather than silently losing every read after it.
 
