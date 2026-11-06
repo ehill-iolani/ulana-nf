@@ -53,6 +53,32 @@
         }
       }
     },
+    "downsampling": {
+      "title": "Downsampling",
+      "type": "object",
+      "description": "Subsample very deep samples before assembly.",
+      "properties": {
+        "enable_downsampling": {
+          "type": "boolean",
+          "default": true,
+          "description": "Subsample each sample's filtered reads to --target_coverage before assembly.",
+          "help_text": "Flye fails on very deep data (a ~91 kb phage at ~5,000x gave 'No disjointigs were assembled'). Reads are picked at random with Rasusa, so plasmids keep their share. A sample below the target keeps every filtered read. Flye and Medaka both use the subsampled reads; {sample}/reads/{sample}.downsampling.tsv records the depth before and after."
+        },
+        "target_coverage": {
+          "type": "integer",
+          "default": 150,
+          "minimum": 1,
+          "description": "Depth to subsample to (x genome size).",
+          "help_text": "Samples with more than this many bases per genome base are cut to it; samples with less are left alone."
+        },
+        "genome_size": {
+          "type": "string",
+          "pattern": "^\\s*\\d+(\\.\\d+)?\\s*[kKmMgG]?([bB][pP]?)?\\s*$",
+          "description": "Expected genome size, e.g. 92kb or 5.5mb. Leave blank to estimate it.",
+          "help_text": "Used to turn --target_coverage into a number of bases. Left blank, LRGE estimates each sample's genome size from its reads (it tends to guess high, which means less subsampling, not more). Set it when every sample in the run has roughly the same genome size. If the estimate fails, that sample keeps every read."
+        }
+      }
+    },
     "assembly": {
       "title": "Assembly",
       "type": "object",
@@ -222,6 +248,7 @@
   "allOf": [
     { "$ref": "#/$defs/input_output_options" },
     { "$ref": "#/$defs/read_filtering" },
+    { "$ref": "#/$defs/downsampling" },
     { "$ref": "#/$defs/assembly" },
     { "$ref": "#/$defs/assembly_graph_image" },
     { "$ref": "#/$defs/polishing" },

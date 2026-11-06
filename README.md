@@ -11,6 +11,7 @@ detection (the same steps and feature toggles as the Snakemake/RShiny original).
 1. `MERGE_FASTQ` -- merge multi-part fastq(.gz) files per sample
 2. `CHOPPER` -- quality + length filtering
    - `READ_STATS` (side branch, `--enable_read_stats`, on by default) -- read length and mean Q-score before vs. after filtering
+   - `DOWNSAMPLE_PLAN` + `DOWNSAMPLE` -- cap very deep samples at `--target_coverage` before assembly (on by default, see [Downsampling](#downsampling))
 3. `FLYE_ASSEMBLY` -- assembly
 4. `BANDAGE_IMAGE` -- render a PNG of the Flye assembly graph (optional, default on)
 5. `MEDAKA_POLISH` -- polish (optional, default on)
@@ -27,7 +28,12 @@ flowchart TD
   B --> R1{enable_read_stats?}
   C --> R1
   R1 -->|yes| R2[READ_STATS]
-  C --> D[FLYE_ASSEMBLY]
+  C --> DS{enable_downsampling?}
+  DS -->|yes| DP[DOWNSAMPLE_PLAN]
+  DP -->|"above --target_coverage"| DD[DOWNSAMPLE]
+  DP -->|below it| D
+  DD --> D
+  DS -->|no| D[FLYE_ASSEMBLY]
 
   D --> D2{enable_bandage?}
   D2 -->|yes| D3[BANDAGE_IMAGE]
@@ -100,6 +106,8 @@ run `nextflow run main.nf --help`. Key ones:
 | `--outdir` | `results` | Output directory |
 | `--chopper_q` / `--chopper_minlength` | `10` / `1000` | chopper quality/length filtering |
 | `--enable_read_stats` | `true` | Read length/Q-score summary before vs. after filtering |
+| `--enable_downsampling` / `--target_coverage` | `true` / `150` | Subsample samples deeper than this to it before assembly (Rasusa) |
+| `--genome_size` | *(blank: LRGE estimates it per sample)* | Genome size the target coverage is worked out from, e.g. `92kb`, `5.5mb` |
 | `--flye_mode` | `--nano-hq` | Flye read-type flag |
 | `--enable_bandage` / `--bandage_height` | `true` / `1000` | Render a PNG of the Flye assembly graph |
 | `--enable_medaka` / `--medaka_model` | `true` / `r1041_e82_400bps_hac_v5.0.0` | Medaka polishing |
@@ -116,7 +124,7 @@ run `nextflow run main.nf --help`. Key ones:
 ```
 results/
   {sample}/
-    reads/            merged + filtered fastq
+    reads/            merged + filtered fastq, {sample}.downsampling.tsv (only if --enable_downsampling)
     assembly/flye/    assembly.fasta, assembly_info.txt, assembly_graph.gfa, assembly_graph.png (only if --enable_bandage)
     polish/medaka/    polished_consensus.fasta (only if --enable_medaka)
     annotation/prokka/  .tsv .faa .ffn .gff (only if --enable_prokka)
@@ -145,6 +153,43 @@ tests/data/                   small synthetic dataset used by -profile test
 scripts/mirror_images.sh      copies the pipeline's container images into our Artifact Registry (see Container mirror)
 .github/workflows/ci.yml      runs -profile test on push/PR
 ```
+
+## Downsampling
+
+Flye fails on very deep data: a ~91 kb phage sequenced to ~5,000x stopped
+with "No disjointigs were assembled", while a 1/20 subsample of the same
+reads assembled into one contig. So before assembly each sample's filtered
+reads are capped at `--target_coverage` (default 150x):
+
+1. `DOWNSAMPLE_PLAN` counts the sample's bases and takes the genome size from
+   `--genome_size`, or, left blank, estimates it from the reads with
+   [LRGE](https://github.com/mbhall88/lrge). LRGE tends to guess high (a
+   5.5 Mb Pseudomonas came out at 7.9 Mb, ~91 kb phages at 82-109 kb), which
+   errs towards keeping more reads, not fewer.
+2. A sample with more than `target_coverage x genome size` bases goes to
+   `DOWNSAMPLE`, where [Rasusa](https://github.com/mbhall88/rasusa) keeps a
+   random subset of about that many bases (seeded, so a rerun picks the same
+   reads). Random rather than best-first, so small plasmids keep their share
+   of the reads.
+3. Any other sample (including one whose genome size couldn't be estimated)
+   keeps every filtered read, as before this step existed.
+
+Flye and Medaka both use the subsampled reads. Flye's `assembly_info.txt`
+coverage, and so the GenBank comment's "Genome Coverage", is then the depth
+of the reads used, about 150x. `reads/{sample}.downsampling.tsv` records
+the decision:
+
+| Column | Meaning |
+|---|---|
+| `read_bases`, `read_coverage` | bases after chopper, and that depth |
+| `genome_size`, `genome_size_source` | bp, and `given` / `estimated` / `unknown` |
+| `target_coverage` | `--target_coverage` |
+| `reads_used` | `subsample` or `all` |
+| `assembly_bases`, `assembly_coverage` | what went to Flye (the target, for a subsample) |
+
+Set `--genome_size` when every sample in the run is the same organism;
+leave it blank for a run mixing organisms. `--enable_downsampling false`
+assembles every read regardless.
 
 ## GenBank submission
 

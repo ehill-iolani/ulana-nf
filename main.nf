@@ -36,6 +36,7 @@ def helpMessage() {
 
     Key optional toggles (all default to the ulana-ht Snakemake defaults):
       --enable_read_stats read length/Q-score summary before vs. after filtering (default ${params.enable_read_stats})
+      --enable_downsampling  subsample very deep samples to --target_coverage before assembly (default ${params.enable_downsampling})
       --enable_medaka     polish the Flye assembly with Medaka (default ${params.enable_medaka})
       --enable_bandage    render a PNG of the Flye assembly graph (default ${params.enable_bandage})
       --enable_prokka     annotate with Prokka (default ${params.enable_prokka})
@@ -48,6 +49,8 @@ def helpMessage() {
 
     Key tool params:
       --chopper_q / --chopper_minlength   chopper quality/length filtering (default ${params.chopper_q} / ${params.chopper_minlength})
+      --target_coverage                   depth to subsample to; a sample below it keeps every read (default ${params.target_coverage})
+      --genome_size                       genome size for --target_coverage, e.g. 92kb or 5.5mb (default: LRGE estimates it per sample)
       --flye_mode                         Flye read-type flag (default ${params.flye_mode})
       --medaka_model                      Medaka model name (default ${params.medaka_model})
 
