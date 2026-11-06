@@ -151,6 +151,7 @@ nextflow_schema.json          JSON Schema describing every --param (for UIs/vali
 conf/test.config              -profile test overrides (small synthetic dataset)
 tests/data/                   small synthetic dataset used by -profile test
 scripts/mirror_images.sh      copies the pipeline's container images into our Artifact Registry (see Container mirror)
+scripts/build_typestrain_db.py  builds the type-strain reference set (NCBI type genomes, skani sketches, 16S db) for the species check; run once per snapshot
 .github/workflows/ci.yml      runs -profile test on push/PR
 ```
 
