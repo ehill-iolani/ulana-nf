@@ -17,7 +17,9 @@
 
 process SPECIES_CHECK_ANI {
     tag "$sample"
-    label 'process_medium'
+    // process_low (4 vCPU / 16 GB on Batch) is plenty: in the Batch test a
+    // 6 Mb genome took ~18 s and peaked at 1.5 GB, the marker index included
+    label 'process_low'
     container "${params.container_registry}/biocontainers/skani:0.4.0--hec9b1f2_0"
     publishDir(path: { "${params.outdir}/${sample}/species_check" }, mode: 'copy')
 
