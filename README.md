@@ -92,7 +92,7 @@ With `--enable_genbank` it also needs `organism` and `locus_tag` columns
 
 ```csv
 sample,fastq,organism,strain,locus_tag
-25-KEA-6,data/25-KEA-6_combined.fastq.gz,Pseudomonas sp.,KEA-6,KEAT
+25-KEA-6,data/25-KEA-6_combined.fastq.gz,Mycobacteroides sp.,KEA-6,KEAT
 ```
 
 Each row needs its own `sample` name (compared ignoring case): two rows with
@@ -176,8 +176,8 @@ reads are capped at `--target_coverage` (default 150x):
 1. `DOWNSAMPLE_PLAN` counts the sample's bases and takes the genome size from
    `--genome_size`, or, left blank, estimates it from the reads with
    [LRGE](https://github.com/mbhall88/lrge). LRGE tends to guess high (a
-   5.5 Mb Pseudomonas came out at 7.9 Mb, ~91 kb phages at 82-109 kb), which
-   errs towards keeping more reads, not fewer.
+   5.5 Mb Mycobacteroides chelonae genome came out at 7.9 Mb, ~91 kb phages
+   at 82-109 kb), which errs towards keeping more reads, not fewer.
 2. A sample with more than `target_coverage x genome size` bases goes to
    `DOWNSAMPLE`, where [Rasusa](https://github.com/mbhall88/rasusa) keeps a
    random subset of about that many bases (seeded, so a rerun picks the same
@@ -273,9 +273,10 @@ to accept the annotation, so the pipeline does that and runs NCBI's own checks:
 
 `submission_info.txt` lists what was changed and the values NCBI's Genome
 Submission Portal asks for. Fix every `ERROR` in the `.val` and every `FATAL`
-in the `.dr` before submitting. On a real 5.5 Mb Pseudomonas assembly with a
-template, the result had no errors or FATALs, only warnings NCBI accepts
-(UniProt product names ending in a bracket, a circular contig not flagged complete).
+in the `.dr` before submitting. On a real 5.5 Mb Mycobacteroides chelonae
+assembly with a template, the result had no errors or FATALs, only warnings
+NCBI accepts (UniProt product names ending in a bracket, a circular contig not
+flagged complete).
 
 ## Container mirror
 

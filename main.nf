@@ -119,7 +119,7 @@ def samplesheetMeta(path) {
                 if (!(meta.organism ==~ safe) || (meta.strain && !(meta.strain ==~ safe))) {
                     error "${where}: organism and strain may only use letters, digits, spaces and . - _ / ( ) : , + #"
                 }
-                // NCBI names an unnamed species by its strain ("Pseudomonas sp. KEA-6")
+                // NCBI names an unnamed species by its strain ("Mycobacteroides sp. KEA-6")
                 if (meta.organism.endsWith(' sp.') && !meta.strain) {
                     error "${where}: organism '${meta.organism}' needs a strain column, since NCBI names an unidentified species by its strain"
                 }

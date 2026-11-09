@@ -25,7 +25,7 @@ Pure standard library. Outputs <prefix>.fsa, <prefix>.tbl, <prefix>.cmt and
 submission_info.txt (what was changed, and what to enter in NCBI's portal):
 
   genbank_prep.py --fsa prokka.fsa --tbl prokka.tbl --assembly-info assembly_info.txt \\
-      --organism "Pseudomonas sp." --strain KEA-6 --locus-tag KEAT \\
+      --organism "Mycobacteroides sp." --strain KEA-6 --locus-tag KEAT \\
       --assembly-method "Flye v. 2.9.6; Medaka v. 2.2.1" --annotation "Prokka 1.14.6" \\
       --out-prefix KEA-6
 """
@@ -160,7 +160,7 @@ def write_tbl(path, contigs):
 
 def organism_name(organism, strain):
     # NCBI wants an unnamed species' strain in the name itself
-    # ("Pseudomonas sp. KEA-6"); a bare "Pseudomonas sp." fails validation
+    # ("Mycobacteroides sp. KEA-6"); a bare "Pseudomonas sp." fails validation
     if strain and organism.endswith(' sp.'):
         return f'{organism} {strain}'
     return organism
