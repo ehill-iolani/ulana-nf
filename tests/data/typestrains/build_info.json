@@ -1,0 +1,10 @@
+{
+  "snapshot": "test",
+  "built": null,
+  "source": "tests/data/generate_test_typestrains.py",
+  "genomes": 1,
+  "species": 1,
+  "failed_downloads": 0,
+  "subset": true,
+  "skani_image": "quay.io/biocontainers/skani:0.4.0--hec9b1f2_0"
+}

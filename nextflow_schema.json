@@ -182,6 +182,25 @@
         }
       }
     },
+    "species_check": {
+      "title": "Species check",
+      "type": "object",
+      "description": "How close each genome is to the nearest named species (NCBI type strains).",
+      "properties": {
+        "enable_species_check": {
+          "type": "boolean",
+          "default": true,
+          "description": "Compare each assembly with NCBI's bacterial type-strain genomes (skani ANI), and its 16S copies with NCBI's 16S type-strain database.",
+          "help_text": "Writes {sample}/species_check/: genome_hits.tsv (closest type strains by ANI and aligned fraction), 16S_hits.tsv (needs --enable_id_genes) and typestrain_db.json (which snapshot was searched). No verdict is written; about 95-96% ANI to a type strain is the usual same-species line. Needs --species_db; without one the step is skipped with a warning."
+        },
+        "species_db": {
+          "type": "string",
+          "description": "Type-strain snapshot folder (local path or gs://) built by scripts/build_typestrain_db.py.",
+          "hidden": true,
+          "help_text": "Holds sketch/ (skani database), typestrains.tsv, build_info.json and 16S/ (BLAST database). The google_batch profile points this at the project's copy; the full snapshot is about 51 GB."
+        }
+      }
+    },
     "genbank_submission": {
       "title": "GenBank submission",
       "type": "object",
@@ -256,6 +275,7 @@
     { "$ref": "#/$defs/quality_control" },
     { "$ref": "#/$defs/identifier_genes" },
     { "$ref": "#/$defs/amr_detection" },
+    { "$ref": "#/$defs/species_check" },
     { "$ref": "#/$defs/genbank_submission" },
     { "$ref": "#/$defs/generic_options" },
     { "$ref": "#/$defs/container_images" }

@@ -1,0 +1,2 @@
+accession	name	species	subspecies	strain	organism_name	taxid	species_taxid	relation_to_type_material	assembly_level	refseq_category	genome_size	gc_percent	seq_rel_date	file
+TEST_000001.1	Testibacter syntheticus	Testibacter syntheticus		T1	Testibacter syntheticus T1	1	1	assembly from type material	Complete Genome	na	30000	50.5	2026-11-01	genomes/TEST_000001.1.fna.gz

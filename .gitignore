@@ -15,6 +15,7 @@ assets/*.csv
 notes.sh
 scratch.sh
 RELEASE_NOTES.md
+scripts/validate_species_check.py
 
 # OS
 .DS_Store

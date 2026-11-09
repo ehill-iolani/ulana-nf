@@ -20,6 +20,7 @@ detection (the same steps and feature toggles as the Snakemake/RShiny original).
 8. `IDENTIFIER_GENES` -- extract 16S rRNA / dnaA / rpoB from Prokka output (optional, default on; requires Prokka)
 9. `AMRFINDER_DB` + `AMRFINDER` -- AMR detection (optional, default on; requires Prokka)
 10. `GENBANK_PREP` + `TABLE2ASN` -- GenBank submission files (optional, default off; requires Prokka and the samplesheet's organism/locus_tag columns, see [GenBank submission](#genbank-submission))
+11. `SPECIES_CHECK_ANI` + `SPECIES_CHECK_16S` -- closest NCBI type strains by genome ANI (skani) and 16S (BLAST) (optional, default on; needs a `--species_db` snapshot, see [Species check](#species-check))
 
 ```mermaid
 flowchart TD
@@ -59,6 +60,11 @@ flowchart TD
 
   J --> S{enable_genbank?}
   S -->|yes| T[GENBANK_PREP] --> U[TABLE2ASN]
+
+  H --> V{enable_species_check?}
+  V -->|yes| W[SPECIES_CHECK_ANI]
+  N --> X{enable_species_check?}
+  X -->|yes| Y[SPECIES_CHECK_16S]
 ```
 
 ## Requirements
@@ -117,6 +123,8 @@ run `nextflow run main.nf --help`. Key ones:
 | `--enable_amrfinder` | `true` | AMRFinderPlus AMR detection (requires `--enable_prokka`); DB is downloaded fresh every run |
 | `--enable_genbank` | `false` | GenBank submission files (requires `--enable_prokka` and the samplesheet's `organism` + `locus_tag` columns) |
 | `--genbank_template` | *(none)* | NCBI submitter template (`.sbt`) to build into the `.sqn` |
+| `--enable_species_check` | `true` | Closest NCBI type strains by genome ANI and 16S (skipped with a warning without `--species_db`) |
+| `--species_db` | *(none; the `google_batch` profile sets it)* | Type-strain snapshot folder from `scripts/build_typestrain_db.py`, local or `gs://` |
 | `--container_registry` / `--dockerhub_registry` | `quay.io` / `docker.io` | Registries the tool images are pulled from. The `google_batch` profile points both at the project's Artifact Registry mirror (see [Container mirror](#container-mirror)); pass the defaults to pull from upstream |
 
 ## Output layout
@@ -132,6 +140,7 @@ results/
     id_genes/         16S_rRNA.fasta, dnaA.fasta, rpoB.fasta, one record per gene copy (only if --enable_id_genes)
     amr/              amrfinder_pro_results.tsv, amrfinder_pro.fasta (only if --enable_amrfinder)
     genbank/          {sample}.sqn .fsa .tbl .cmt .gbf .val .stats .dr, submission_info.txt (only if --enable_genbank)
+    species_check/    genome_hits.tsv, 16S_hits.tsv, typestrain_db.json (only if --enable_species_check with a --species_db)
   read_qc/            read_qc_summary.html, read_stats.tsv, read_length_qscore_hist.tsv (only if --enable_read_stats)
   db/amrfinder_db/    AMRFinderPlus database for this run
   pipeline_info/       Nextflow timeline/report/trace
@@ -146,6 +155,8 @@ modules/*.nf                 one process per tool, one container each
 bin/read_stats.py            read length/Q-score summary (stdlib only; also runs stand-alone)
 bin/pick_genes.sh            pulls the identifier genes out of Prokka's .ffn, one record per copy
 bin/genbank_prep.py          Prokka .fsa/.tbl -> GenBank-ready files (stdlib only; also runs stand-alone)
+bin/species_hits.sh          skani hits + typestrains.tsv -> species_check/genome_hits.tsv
+bin/sixteen_s_hits.sh        BLASTs the full-length 16S copies -> species_check/16S_hits.tsv
 nextflow.config               param defaults, profiles, resource labels
 nextflow_schema.json          JSON Schema describing every --param (for UIs/validation tooling)
 conf/test.config              -profile test overrides (small synthetic dataset)
@@ -191,6 +202,45 @@ the decision:
 Set `--genome_size` when every sample in the run is the same organism;
 leave it blank for a run mixing organisms. `--enable_downsampling false`
 assembles every read regardless.
+
+## Species check
+
+Compares each assembly with every bacterial type-strain genome in NCBI
+RefSeq (one per species or subspecies, about 21,000) to show how close it
+is to the nearest named species, in the spirit of
+[TYGS](https://tygs.dsmz.de/).
+
+- `SPECIES_CHECK_ANI`: [skani](https://github.com/bluenote-1577/skani)
+  ANI and aligned fractions against the type-strain genomes, top 20 hits.
+- `SPECIES_CHECK_16S`: each 16S copy of 1,200 bp or more (from
+  `IDENTIFIER_GENES`) BLASTed against NCBI's `16S_ribosomal_RNA` type-strain
+  database, top 10 hits per copy. Supporting evidence only: 16S often can't
+  tell close species apart.
+
+The pipeline writes the hits and no verdict. The platform's results page
+reads them as: ANI >= 96% (with >= 50% of the assembly aligned) = same
+species; 95-96% = borderline; 85-95% = possible new species; below that, or
+no hit, = no close type strain; and nothing when CheckM puts the genome
+under 90% complete or over 5% contamination. A "possible new species" is a
+lead, not a description: confirm with dDDH (TYGS) before naming anything.
+These cutoffs came from a leave-one-out test over 226 type genomes (each
+held out of its own species), kept with the snapshot.
+
+`{sample}/species_check/`:
+
+| File | Contents |
+|---|---|
+| `genome_hits.tsv` | `accession`, `name`, `species`, `subspecies`, `strain`, `taxid`, `species_taxid`, `ani`, `af_query` (% of this assembly aligned), `af_ref`, `assembly_level`, `relation_to_type_material`, `genome_size`; best ANI first, header only if no type strain is within ~80% |
+| `16S_hits.tsv` | `copy`, `copy_length`, `accession`, `taxid`, `organism`, `identity`, `align_length`, `query_cover`, `bitscore`, `title`; header only with no full-length copy |
+| `typestrain_db.json` | the snapshot searched (its `build_info.json`) |
+
+**The type-strain snapshot** (`--species_db`) is built once with
+`scripts/build_typestrain_db.py` (see its header; about 51 GB, of which a
+run reads the 11 GB skani `sketch/`, `typestrains.tsv`, `build_info.json`
+and the 16S BLAST files). The `google_batch` profile points at
+`gs://nextflow-jobs/ulana/db_cache/typestrains/2026-11`. A new snapshot is a
+new dated folder. Without a `--species_db` the step is skipped with a
+warning, so local runs work without the download.
 
 ## GenBank submission
 
@@ -262,6 +312,9 @@ Runs against two synthetic samples checked into `tests/data/` (see
 CheckM and AMRFinder are off in this profile since both need multi-GB
 reference databases fetched at runtime, impractical for CI -- Prokka and
 Medaka stay on since neither needs an external download.
+The species check runs against `tests/data/typestrains/`, a one-genome
+snapshot made by `tests/data/generate_test_typestrains.py` from sample_a's
+own synthetic genome: sample_a comes out at ~99-100% ANI, sample_b with no hit.
 
 ## Relationship to ulana-ht
 

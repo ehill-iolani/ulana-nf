@@ -12,6 +12,7 @@ include { IDENTIFIER_GENES } from '../modules/identifier_genes.nf'
 include { AMRFINDER_DB     } from '../modules/amrfinder_db.nf'
 include { AMRFINDER        } from '../modules/amrfinder.nf'
 include { GENBANK_PREP; TABLE2ASN } from '../modules/genbank.nf'
+include { SPECIES_CHECK_ANI; SPECIES_CHECK_16S } from '../modules/species_check.nf'
 
 // --genome_size as a whole number of bases: "92kb", "5.5 Mb", "4600000" ->
 // 92000 / 5500000 / 4600000; blank -> 0 (estimate it). Stops the run at launch
@@ -155,6 +156,31 @@ workflow ULANA_WGS {
             GENBANK_PREP.out.files.join(annotation_ch),
             params.genbank_template ? file(params.genbank_template, checkIfExists: true) : []
         )
+    }
+
+    // 10. species check -- optional, needs a type-strain snapshot
+    // (--species_db, built by scripts/build_typestrain_db.py; the google_batch
+    // profile points it at the project's copy). Without one the step is
+    // skipped with a warning rather than failing, so a local run with no
+    // 50 GB snapshot still works. The 16S half needs IDENTIFIER_GENES' 16S copies
+    if (params.enable_species_check) {
+        if (!params.species_db) {
+            log.warn "Species check skipped: no --species_db given (a type-strain snapshot from scripts/build_typestrain_db.py)"
+        } else {
+            def db = params.species_db.toString().replaceAll('/+$', '')
+            SPECIES_CHECK_ANI(
+                assembly_ch,
+                file("${db}/sketch", type: 'dir', checkIfExists: true),
+                file("${db}/typestrains.tsv", checkIfExists: true),
+                file("${db}/build_info.json", checkIfExists: true)
+            )
+            if (params.enable_id_genes) {
+                SPECIES_CHECK_16S(
+                    IDENTIFIER_GENES.out.genes.map { sample, sixteen_s, dnaA, rpoB -> tuple(sample, sixteen_s) },
+                    files("${db}/16S/16S_ribosomal_RNA.*", checkIfExists: true)
+                )
+            }
+        }
     }
 
     emit:

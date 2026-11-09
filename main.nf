@@ -46,6 +46,9 @@ def helpMessage() {
       --enable_genbank    GenBank submission files (.sqn, feature table, validation report), requires --enable_prokka
                           and organism + locus_tag samplesheet columns (default ${params.enable_genbank})
       --genbank_template  NCBI submission template (.sbt) to build into the .sqn (optional)
+      --enable_species_check  compare each assembly with NCBI type-strain genomes (skani ANI) and 16S (BLAST);
+                          needs --species_db, else skipped with a warning (default ${params.enable_species_check})
+      --species_db        type-strain snapshot folder from scripts/build_typestrain_db.py (local or gs://)
 
     Key tool params:
       --chopper_q / --chopper_minlength   chopper quality/length filtering (default ${params.chopper_q} / ${params.chopper_minlength})
