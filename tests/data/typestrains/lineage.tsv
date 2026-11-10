@@ -1,0 +1,5 @@
+taxid	current_taxid	species_taxid	species	genus	family	order	class	phylum	domain	gtotree_sets
+1	1	1	Testibacter syntheticus	Testibacter	Testibacteraceae				Bacteria	Bacteria
+900002	900002	900002	Testibacter proximus	Testibacter	Testibacteraceae				Bacteria	Bacteria
+900003	900003	900003	Testibacter medius	Testibacter	Testibacteraceae				Bacteria	Bacteria
+900004	900004	900004	Testibacter remotus	Testibacter	Testibacteraceae				Bacteria	Bacteria

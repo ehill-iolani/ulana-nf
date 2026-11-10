@@ -2,7 +2,7 @@ skani database
 ==============
 
 Built by   : skani 0.4.0
-Built on   : 2026-11-09 19:43:58 UTC
+Built on   : 2026-11-10 22:14:07 UTC
 Command    : skani sketch -l genomes.txt -o sketch
 
 Sketch parameters (baked in -- see the last note)
@@ -12,7 +12,7 @@ Sketch parameters (baked in -- see the last note)
   marker c              : 1000
   sequence type         : DNA
   individual contigs    : no
-  inputs sketched       : 1
+  inputs sketched       : 4
 
 Files
 -----

@@ -197,7 +197,13 @@
           "type": "string",
           "description": "Type-strain snapshot folder (local path or gs://) built by scripts/build_typestrain_db.py.",
           "hidden": true,
-          "help_text": "Holds sketch/ (skani database), typestrains.tsv, build_info.json and 16S/ (BLAST database). The google_batch profile points this at the project's copy; the full snapshot is about 51 GB."
+          "help_text": "Holds sketch/ (skani database), typestrains.tsv, build_info.json and 16S/ (BLAST database), plus lineage.tsv and gtotree_hmms/ for the species tree. The google_batch profile points this at the project's copy; the full snapshot is about 51 GB."
+        },
+        "enable_species_tree": {
+          "type": "boolean",
+          "default": true,
+          "description": "Draw a marker-gene tree of each assembly with its closest type strains (GToTree + IQ-TREE), with support values.",
+          "help_text": "Writes {sample}/species_check/tree/: neighbours.tsv (the type strains used: up to 10, one per species except the closest species keeps all its type strains; from the genome hits first, then 16S hits when there are few or none), tree.nwk (UFBoot support at each fork), tree_report.txt, ani.tsv (pairwise ANI between them) and tree_info.json (marker set, model, or why no tree was drawn). Needs --enable_species_check and a snapshot with lineage.tsv and gtotree_hmms/. Adds roughly 5-15 minutes per sample."
         }
       }
     },

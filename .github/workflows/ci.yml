@@ -24,5 +24,9 @@ jobs:
         with:
           version: "latest-stable"
 
+      # -stub-run: only SPECIES_TREE has a stub (the synthetic genomes have no
+      # marker genes, so GToTree can't build a real tree from them); it writes
+      # a star tree over the real neighbours instead. Every other step runs for
+      # real. Run -profile test without -stub-run locally to exercise GToTree
       - name: Run pipeline against the synthetic test dataset
-        run: nextflow run main.nf -profile test,docker
+        run: nextflow run main.nf -profile test,docker -stub-run

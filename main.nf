@@ -49,6 +49,8 @@ def helpMessage() {
       --enable_species_check  compare each assembly with NCBI type-strain genomes (skani ANI) and 16S (BLAST);
                           needs --species_db, else skipped with a warning (default ${params.enable_species_check})
       --species_db        type-strain snapshot folder from scripts/build_typestrain_db.py (local or gs://)
+      --enable_species_tree  marker-gene tree of each assembly with its closest type strains (GToTree + IQ-TREE);
+                          needs --enable_species_check (default ${params.enable_species_tree})
 
     Key tool params:
       --chopper_q / --chopper_minlength   chopper quality/length filtering (default ${params.chopper_q} / ${params.chopper_minlength})

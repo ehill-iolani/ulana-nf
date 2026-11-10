@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """
-Adds lineage.tsv to a type-strain snapshot (see build_typestrain_db.py): the
-NCBI lineage of every taxid the species check and the tree step can meet, and
-which GToTree marker-gene sets fit it. Built from NCBI's taxdump; no genomes
-are touched, so an existing snapshot gets it without a rebuild.
+Adds what the species tree needs to a type-strain snapshot (see
+build_typestrain_db.py), without a rebuild:
+
+  lineage.tsv     the NCBI lineage of every taxid the species check and the
+                  tree can meet, and which GToTree marker-gene sets fit it,
+                  from NCBI's taxdump
+  gtotree_hmms/   those marker sets (<set>.hmm, ~160 MB), so a run never
+                  fetches them (GToTree would download one from Zenodo per run)
 
 Rows: every taxid and species_taxid in typestrains.tsv, plus every taxid in
 the snapshot's 16S BLAST database (strain-level taxids; the tree's fallback
@@ -27,20 +31,23 @@ The tree step picks the first set shared by the query's closest hit and all of
 its neighbours (a neighbourhood that spans classes falls back to the phylum,
 then Bacteria).
 
-Usage (about 1 minute; the taxdump is ~80 MB):
+Usage (a few minutes; the taxdump is ~80 MB, the marker sets ~160 MB):
 
-  build_typestrain_lineage.py --snapshot /data/typestrains --out lineage.tsv
-  gcloud storage cp lineage.tsv gs://nextflow-jobs/ulana/db_cache/typestrains/2026-11/
+  build_typestrain_lineage.py --snapshot /data/typestrains --out lineage.tsv --hmms gtotree_hmms
+  gcloud storage cp -r lineage.tsv gtotree_hmms gs://nextflow-jobs/ulana/db_cache/typestrains/2026-11/
 
 --snapshot needs typestrains.tsv and 16S/ (or pass --typestrains and
 --sixteen-s-taxids yourself). The 16S taxids come from blastdbcmd, on PATH or
 through docker (BLAST_IMAGE, keep in step with modules/species_check.nf).
 --taxdump takes an unpacked taxdump directory instead of downloading one.
-Pure standard library otherwise.
+--hmms fetches the marker sets by the links and md5s in GToTree's own
+hmm-sources-and-info.tsv (read from GTOTREE_IMAGE, keep in step with
+modules/species_tree.nf). Pure standard library otherwise.
 """
 import argparse
 import collections
 import csv
+import hashlib
 import json
 import os
 import shutil
@@ -52,6 +59,7 @@ import urllib.request
 
 TAXDUMP_URL = 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
 BLAST_IMAGE = 'quay.io/biocontainers/blast:2.15.0--pl5321h6f7f691_1'
+GTOTREE_IMAGE = 'quay.io/biocontainers/gtotree:1.8.19--h9ee0642_0'
 USER_AGENT = 'ulana-nf-typestrain-build'
 
 # GToTree 1.8.19 HMM set -> NCBI taxid it was built for (checked against the
@@ -120,6 +128,37 @@ def sixteen_s_taxids(db_dir):
     return {t.strip() for t in out.split() if t.strip()}
 
 
+def fetch_hmms(dest):
+    """Every GToTree set lineage.tsv can name (Archaea aside: the tree skips
+    archaea), checked against GToTree's md5s. Ones already there and right are kept."""
+    info = subprocess.run(['docker', 'run', '--rm', '--platform', 'linux/amd64', GTOTREE_IMAGE, 'cat',
+                           '/usr/local/share/gtotree/hmm_sets/hmm-sources-and-info.tsv'],
+                          check=True, capture_output=True, text=True).stdout
+    rows = {r['file']: r for r in csv.DictReader(info.splitlines(), delimiter='\t')}
+    os.makedirs(dest, exist_ok=True)
+    for name in GTOTREE_SETS:
+        if name == 'Archaea':
+            continue
+        row, path = rows[f'{name}.hmm'], os.path.join(dest, f'{name}.hmm')
+        if os.path.exists(path) and md5(path) == row['md5']:
+            continue
+        log(f'downloading {name}.hmm')
+        req = urllib.request.Request(row['link'], headers={'User-Agent': USER_AGENT})
+        with urllib.request.urlopen(req, timeout=600) as r, open(path, 'wb') as f:
+            shutil.copyfileobj(r, f)
+        if md5(path) != row['md5']:
+            os.remove(path)
+            sys.exit(f'{name}.hmm: md5 mismatch, removed; rerun to retry')
+
+
+def md5(path):
+    h = hashlib.md5()
+    with open(path, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 20), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0],
                                  formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
@@ -128,7 +167,10 @@ def main():
     ap.add_argument('--sixteen-s-taxids', help='file of 16S db taxids, one per line (default: read <snapshot>/16S)')
     ap.add_argument('--taxdump', help='unpacked taxdump directory (default: download it)')
     ap.add_argument('--out', required=True, help='lineage.tsv to write')
+    ap.add_argument('--hmms', help='also fetch the GToTree marker sets into this folder (gtotree_hmms/)')
     args = ap.parse_args()
+    if args.hmms:
+        fetch_hmms(args.hmms)
 
     ts_path = args.typestrains or (args.snapshot and os.path.join(args.snapshot, 'typestrains.tsv'))
     if not ts_path:

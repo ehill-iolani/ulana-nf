@@ -6,18 +6,23 @@
 # much of the copy they cover. Supporting evidence only; the genome ANI is
 # the verdict.
 #
+# The search keeps 100 hits per copy, not 10: 16S_hits.tsv shows the top 10,
+# and the rest (16S_wide.tsv, not published) let the species tree find type
+# genomes beyond the nearest species when skani has few or no hits.
+#
 # Copies under 1,200 bp are skipped: a partial 16S at a contig end can't
 # separate species, and NCBI's own entries are close to full length. Header
 # only when no copy is long enough (or Prokka found none: the placeholder
 # record has no sequence).
 #
-#   sixteen_s_hits.sh <16S_rRNA.fasta> <blast db prefix> <threads> <out.tsv>
+#   sixteen_s_hits.sh <16S_rRNA.fasta> <blast db prefix> <threads> <out.tsv> [wide.tsv]
 set -euo pipefail
 
 genes=$1
 db=$2
 threads=$3
 out=$4
+wide=${5:-16S_wide.tsv}
 min_length=1200
 
 awk -v min="$min_length" '
@@ -27,13 +32,16 @@ awk -v min="$min_length" '
     END { flush() }
 ' "$genes" > full_length.fasta
 
+: > "$wide"
 printf 'copy\tcopy_length\taccession\ttaxid\torganism\tidentity\talign_length\tquery_cover\tbitscore\ttitle\n' > "$out"
 
 if [ -s full_length.fasta ]; then
     blastn -task megablast -query full_length.fasta -db "$db" \
-        -max_target_seqs 10 -max_hsps 1 -num_threads "$threads" \
+        -max_target_seqs 100 -max_hsps 1 -num_threads "$threads" \
         -outfmt '6 qseqid qlen sacc staxid pident length qcovs bitscore stitle' \
-        > blast.tsv
+        > "$wide"
+    # BLAST lists each copy's hits best first; the table keeps the first 10
+    awk -F '\t' 'n[$1]++ < 10' "$wide" > blast.tsv
     # "Escherichia coli strain U 5/41 16S ribosomal RNA, complete sequence"
     # -> organism "Escherichia coli strain U 5/41"; the full title stays too
     awk -F '\t' -v OFS='\t' '{

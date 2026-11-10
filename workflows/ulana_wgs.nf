@@ -13,6 +13,7 @@ include { AMRFINDER_DB     } from '../modules/amrfinder_db.nf'
 include { AMRFINDER        } from '../modules/amrfinder.nf'
 include { GENBANK_PREP; TABLE2ASN } from '../modules/genbank.nf'
 include { SPECIES_CHECK_ANI; SPECIES_CHECK_16S } from '../modules/species_check.nf'
+include { SPECIES_TREE_PICK; SPECIES_TREE; SPECIES_TREE_ANI } from '../modules/species_tree.nf'
 
 // --genome_size as a whole number of bases: "92kb", "5.5 Mb", "4600000" ->
 // 92000 / 5500000 / 4600000; blank -> 0 (estimate it). Stops the run at launch
@@ -179,6 +180,43 @@ workflow ULANA_WGS {
                     IDENTIFIER_GENES.out.genes.map { sample, sixteen_s, dnaA, rpoB -> tuple(sample, sixteen_s) },
                     files("${db}/16S/16S_ribosomal_RNA.*", checkIfExists: true)
                 )
+            }
+
+            // 10b. species tree (modules/species_tree.nf) -- optional; needs the
+            // snapshot's lineage.tsv + gtotree_hmms/ (scripts/build_typestrain_lineage.py),
+            // so an older snapshot without them skips it with a warning. Without
+            // --enable_id_genes the neighbours come from skani alone
+            if (params.enable_species_tree) {
+                def lineage = file("${db}/lineage.tsv")
+                if (!lineage.exists()) {
+                    log.warn "Species tree skipped: ${db} has no lineage.tsv (add it with scripts/build_typestrain_lineage.py)"
+                } else {
+                    def wide_ch = params.enable_id_genes
+                        ? SPECIES_CHECK_16S.out.wide
+                        : SPECIES_CHECK_ANI.out.hits.map { sample, hits -> tuple(sample, []) }
+                    SPECIES_TREE_PICK(
+                        SPECIES_CHECK_ANI.out.hits.join(wide_ch),
+                        file("${db}/typestrains.tsv", checkIfExists: true),
+                        lineage
+                    )
+                    // a sample with too few neighbours stops here (its
+                    // tree_info.json says why); the rest stage their
+                    // neighbours' genomes from the snapshot's genomes/
+                    def tree_plan = SPECIES_TREE_PICK.out.plan
+                        .map { sample, pick, genomes ->
+                            tuple(sample, pick, new groovy.json.JsonSlurper().parseText(pick.text), genomes)
+                        }
+                        .filter { sample, pick, plan, genomes -> plan.status == 'build' }
+                        .map { sample, pick, plan, genomes ->
+                            def staged = genomes.readLines().findAll { acc -> acc.trim() }.collect { acc ->
+                                file("${db}/genomes/${acc.trim()}.fna.gz", checkIfExists: true)
+                            }
+                            tuple(sample, staged, file("${db}/gtotree_hmms/${plan.gtotree_set}.hmm", checkIfExists: true), pick)
+                        }
+                    tree_input = assembly_ch.join(tree_plan)
+                    SPECIES_TREE(tree_input)
+                    SPECIES_TREE_ANI(tree_input.map { sample, contigs, staged, hmm, pick -> tuple(sample, contigs, staged) })
+                }
             }
         }
     }

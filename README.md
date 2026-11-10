@@ -21,6 +21,7 @@ detection (the same steps and feature toggles as the Snakemake/RShiny original).
 9. `AMRFINDER_DB` + `AMRFINDER` -- AMR detection (optional, default on; requires Prokka)
 10. `GENBANK_PREP` + `TABLE2ASN` -- GenBank submission files (optional, default off; requires Prokka and the samplesheet's organism/locus_tag columns, see [GenBank submission](#genbank-submission))
 11. `SPECIES_CHECK_ANI` + `SPECIES_CHECK_16S` -- closest NCBI type strains by genome ANI (skani) and 16S (BLAST) (optional, default on; needs a `--species_db` snapshot, see [Species check](#species-check))
+12. `SPECIES_TREE_PICK` + `SPECIES_TREE` + `SPECIES_TREE_ANI` -- marker-gene tree of the assembly with its closest type strains (GToTree + IQ-TREE) and their pairwise ANI (optional, default on; needs the species check, see [Species tree](#species-tree))
 
 ```mermaid
 flowchart TD
@@ -65,6 +66,11 @@ flowchart TD
   V -->|yes| W[SPECIES_CHECK_ANI]
   N --> X{enable_species_check?}
   X -->|yes| Y[SPECIES_CHECK_16S]
+
+  W --> Z{enable_species_tree?}
+  Y --> Z
+  Z -->|yes| Z1[SPECIES_TREE_PICK] --> Z2[SPECIES_TREE]
+  Z1 --> Z3[SPECIES_TREE_ANI]
 ```
 
 ## Requirements
@@ -125,6 +131,7 @@ run `nextflow run main.nf --help`. Key ones:
 | `--genbank_template` | *(none)* | NCBI submitter template (`.sbt`) to build into the `.sqn` |
 | `--enable_species_check` | `true` | Closest NCBI type strains by genome ANI and 16S (skipped with a warning without `--species_db`) |
 | `--species_db` | *(none; the `google_batch` profile sets it)* | Type-strain snapshot folder from `scripts/build_typestrain_db.py`, local or `gs://` |
+| `--enable_species_tree` | `true` | Marker-gene tree with the closest type strains (needs the species check and a snapshot with `lineage.tsv` + `gtotree_hmms/`) |
 | `--container_registry` / `--dockerhub_registry` | `quay.io` / `docker.io` | Registries the tool images are pulled from. The `google_batch` profile points both at the project's Artifact Registry mirror (see [Container mirror](#container-mirror)); pass the defaults to pull from upstream |
 
 ## Output layout
@@ -141,6 +148,7 @@ results/
     amr/              amrfinder_pro_results.tsv, amrfinder_pro.fasta (only if --enable_amrfinder)
     genbank/          {sample}.sqn .fsa .tbl .cmt .gbf .val .stats .dr, submission_info.txt (only if --enable_genbank)
     species_check/    genome_hits.tsv, 16S_hits.tsv, typestrain_db.json (only if --enable_species_check with a --species_db)
+      tree/           neighbours.tsv, tree.nwk, tree_report.txt, ani.tsv, tree_info.json (only if --enable_species_tree)
   read_qc/            read_qc_summary.html, read_stats.tsv, read_length_qscore_hist.tsv (only if --enable_read_stats)
   db/amrfinder_db/    AMRFinderPlus database for this run
   pipeline_info/       Nextflow timeline/report/trace
@@ -157,14 +165,17 @@ bin/pick_genes.sh            pulls the identifier genes out of Prokka's .ffn, on
 bin/genbank_prep.py          Prokka .fsa/.tbl -> GenBank-ready files (stdlib only; also runs stand-alone)
 bin/species_hits.sh          skani hits + typestrains.tsv -> species_check/genome_hits.tsv
 bin/sixteen_s_hits.sh        BLASTs the full-length 16S copies -> species_check/16S_hits.tsv
+bin/species_tree_pick.py     picks the species tree's type-strain neighbours and marker set (stdlib only)
+bin/species_tree.py          GToTree + IQ-TREE -> species_check/tree/tree.nwk, tree_info.json
+bin/species_tree_ani.sh      skani triangle over the same genomes -> species_check/tree/ani.tsv
 nextflow.config               param defaults, profiles, resource labels
 nextflow_schema.json          JSON Schema describing every --param (for UIs/validation tooling)
 conf/test.config              -profile test overrides (small synthetic dataset)
 tests/data/                   small synthetic dataset used by -profile test
 scripts/mirror_images.sh      copies the pipeline's container images into our Artifact Registry (see Container mirror)
 scripts/build_typestrain_db.py  builds the type-strain reference set (NCBI type genomes, skani sketches, 16S db) for the species check; run once per snapshot
-scripts/build_typestrain_lineage.py  adds lineage.tsv to a snapshot (NCBI lineage + GToTree marker set per taxid, from the taxdump)
-.github/workflows/ci.yml      runs -profile test on push/PR
+scripts/build_typestrain_lineage.py  adds lineage.tsv + gtotree_hmms/ to a snapshot (NCBI lineage + GToTree marker set per taxid, and the sets themselves)
+.github/workflows/ci.yml      runs -profile test -stub-run on push/PR
 ```
 
 ## Downsampling
@@ -215,7 +226,8 @@ is to the nearest named species, in the spirit of
   ANI and aligned fractions against the type-strain genomes, top 20 hits.
 - `SPECIES_CHECK_16S`: each 16S copy of 1,200 bp or more (from
   `IDENTIFIER_GENES`) BLASTed against NCBI's `16S_ribosomal_RNA` type-strain
-  database, top 10 hits per copy. Supporting evidence only: 16S often can't
+  database, top 10 hits per copy (the search keeps 100; the rest feed the
+  species tree's neighbour pick). Supporting evidence only: 16S often can't
   tell close species apart.
 
 The pipeline writes the hits and no verdict. The platform's results page
@@ -240,10 +252,56 @@ held out of its own species), kept with the snapshot.
 run reads the 11 GB skani `sketch/`, `typestrains.tsv`, `build_info.json`
 and the 16S BLAST files). `scripts/build_typestrain_lineage.py` adds
 `lineage.tsv` (current names, lineage and GToTree marker set for every taxid
-in `typestrains.tsv` and the 16S db) without a rebuild. The `google_batch` profile points at
+in `typestrains.tsv` and the 16S db) and `gtotree_hmms/` (the marker sets,
+~160 MB) for the species tree, without a rebuild. The `google_batch` profile points at
 `gs://nextflow-jobs/ulana/db_cache/typestrains/2026-11`. A new snapshot is a
 new dated folder. Without a `--species_db` the step is skipped with a
 warning, so local runs work without the download.
+
+## Species tree
+
+Places the assembly among its closest named relatives on a marker-gene
+protein tree with support values, the tree TYGS draws beside its dDDH table.
+The species check says how close; the tree shows where.
+
+- `SPECIES_TREE_PICK` picks up to 10 type-strain genomes from the snapshot:
+  the species check's genome hits first, best ANI first, one genome per
+  species, except the closest species keeps all its type strains (so a split
+  inside it, such as between subspecies, shows); then, to fill up, the 16S
+  hits (query cover >= 90, best identity first) mapped to a type genome of the
+  same species through `lineage.tsv`. With no genome hit at all (a possible
+  new genus) every neighbour comes from 16S. The marker set is the most
+  specific GToTree set all of them share (`lineage.tsv`; e.g.
+  Gammaproteobacteria, then Proteobacteria, then Bacteria). Fewer than 3
+  neighbours: no tree.
+- `SPECIES_TREE`: [GToTree](https://github.com/AstrobioMike/GToTree) finds
+  the set's single-copy marker genes in each genome and builds one
+  concatenated protein alignment (a genome with under half the markers is
+  dropped); [IQ-TREE](https://iqtree.github.io/) builds a maximum-likelihood
+  tree with 1,000 ultrafast bootstraps (`-bnni`), the model chosen by BIC
+  from LG/WAG/JTT/Q.pfam x (+F) x (G4/R4).
+- `SPECIES_TREE_ANI`: skani ANI between every pair of the same genomes, for
+  an ANI view and 95% species groups. Pairs under ~80% are missing.
+
+Hand tests (2026-11-10, leave-one-out cases from the snapshot's validation
+set): the model choice never changed a tree's shape, only support at weak
+forks; the lineage marker set did change shapes compared with the general
+Bacteria set; and for a held-out genus the tree found the nearest relative
+by protein identity where the 16S order didn't.
+
+`{sample}/species_check/tree/`:
+
+| File | Contents |
+|---|---|
+| `neighbours.tsv` | `label` (`query` = this assembly, else the accession), `accession`, `name`, `species`, `species_taxid`, `genus`, `family`, `source` (`skani` / `16S`), `ani`, `af_query`, `identity_16S`, `query_cover_16S` |
+| `tree.nwk` | the tree, leaves labelled as in `neighbours.tsv`, UFBoot (0-100) at each fork; unrooted |
+| `tree_report.txt` | IQ-TREE's report: model, likelihood, alignment |
+| `ani.tsv` | `a`, `b`, `ani`, `af_a`, `af_b` for every pair skani reported |
+| `tree_info.json` | `status` (`built`, `no_neighbours`, `too_few_neighbours`, `too_few_marker_genes`), neighbours and their sources, `gtotree_set`, genes in the set / found in the assembly, alignment columns, informative sites, model, genomes GToTree dropped, tool versions |
+
+Cost: GToTree and IQ-TREE run on `process_medium`; roughly 5-15 minutes per
+sample, longest for a distant neighbourhood. The neighbours' genomes (~10 x
+2-6 MB) are read from the snapshot's `genomes/`.
 
 ## GenBank submission
 
@@ -316,9 +374,14 @@ Runs against two synthetic samples checked into `tests/data/` (see
 CheckM and AMRFinder are off in this profile since both need multi-GB
 reference databases fetched at runtime, impractical for CI -- Prokka and
 Medaka stay on since neither needs an external download.
-The species check runs against `tests/data/typestrains/`, a one-genome
+The species check runs against `tests/data/typestrains/`, a four-genome
 snapshot made by `tests/data/generate_test_typestrains.py` from sample_a's
-own synthetic genome: sample_a comes out at ~99-100% ANI, sample_b with no hit.
+own synthetic genome and three made-up relatives (~94, 91, 87% ANI):
+sample_a comes out at ~99-100% ANI with a species tree, sample_b with no hit
+and no tree. The synthetic genomes have no marker genes, so GToTree can't
+build a real tree from them: CI runs `-profile test -stub-run`, where
+`SPECIES_TREE` writes a star tree over the real neighbours instead, and a
+plain `-profile test` ends that step in `too_few_marker_genes`.
 
 ## Relationship to ulana-ht
 

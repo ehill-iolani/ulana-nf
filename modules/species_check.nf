@@ -50,7 +50,7 @@ process SPECIES_CHECK_16S {
     tag "$sample"
     label 'process_low'
     container "${params.container_registry}/biocontainers/blast:2.15.0--pl5321h6f7f691_1"
-    publishDir(path: { "${params.outdir}/${sample}/species_check" }, mode: 'copy')
+    publishDir(path: { "${params.outdir}/${sample}/species_check" }, mode: 'copy', pattern: '16S_hits.tsv')
 
     input:
     tuple val(sample), path(sixteen_s)
@@ -58,9 +58,11 @@ process SPECIES_CHECK_16S {
 
     output:
     tuple val(sample), path("16S_hits.tsv"), emit: hits
+    // all 100 hits per copy, for the species tree's neighbour pick (not published)
+    tuple val(sample), path("16S_wide.tsv"), emit: wide
 
     script:
     """
-    sixteen_s_hits.sh ${sixteen_s} 16S_ribosomal_RNA ${task.cpus} 16S_hits.tsv
+    sixteen_s_hits.sh ${sixteen_s} 16S_ribosomal_RNA ${task.cpus} 16S_hits.tsv 16S_wide.tsv
     """
 }
