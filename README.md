@@ -163,6 +163,7 @@ conf/test.config              -profile test overrides (small synthetic dataset)
 tests/data/                   small synthetic dataset used by -profile test
 scripts/mirror_images.sh      copies the pipeline's container images into our Artifact Registry (see Container mirror)
 scripts/build_typestrain_db.py  builds the type-strain reference set (NCBI type genomes, skani sketches, 16S db) for the species check; run once per snapshot
+scripts/build_typestrain_lineage.py  adds lineage.tsv to a snapshot (NCBI lineage + GToTree marker set per taxid, from the taxdump)
 .github/workflows/ci.yml      runs -profile test on push/PR
 ```
 
@@ -237,7 +238,9 @@ held out of its own species), kept with the snapshot.
 **The type-strain snapshot** (`--species_db`) is built once with
 `scripts/build_typestrain_db.py` (see its header; about 51 GB, of which a
 run reads the 11 GB skani `sketch/`, `typestrains.tsv`, `build_info.json`
-and the 16S BLAST files). The `google_batch` profile points at
+and the 16S BLAST files). `scripts/build_typestrain_lineage.py` adds
+`lineage.tsv` (current names, lineage and GToTree marker set for every taxid
+in `typestrains.tsv` and the 16S db) without a rebuild. The `google_batch` profile points at
 `gs://nextflow-jobs/ulana/db_cache/typestrains/2026-11`. A new snapshot is a
 new dated folder. Without a `--species_db` the step is skipped with a
 warning, so local runs work without the download.
