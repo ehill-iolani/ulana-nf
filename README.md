@@ -269,8 +269,11 @@ The species check says how close; the tree shows where.
   species, except the closest species keeps all its type strains (so a split
   inside it, such as between subspecies, shows); then, to fill up, the 16S
   hits (query cover >= 90, best identity first) mapped to a type genome of the
-  same species through `lineage.tsv`. With no genome hit at all (a possible
-  new genus) every neighbour comes from 16S. The marker set is the most
+  same species through `lineage.tsv`, taking only species that share the
+  closest neighbour's most specific marker set (so an added relative never
+  pushes the tree onto a broader set with fewer genes) unless that leaves
+  fewer than 3. With no genome hit at all (a possible new genus) every
+  neighbour comes from 16S. The marker set is the most
   specific GToTree set all of them share (`lineage.tsv`; e.g.
   Gammaproteobacteria, then Proteobacteria, then Bacteria). Fewer than 3
   neighbours: no tree.

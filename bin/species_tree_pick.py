@@ -12,8 +12,12 @@ Neighbours, up to --max (10):
      with query cover >= 90, best identity first, one genome per species,
      taken through lineage.tsv (16S taxids are strain-level) to a type genome
      of the same species; species with no genome, and archaea, are skipped.
-     With no skani hit at all this is where every neighbour comes from (a
-     possible new genus); otherwise it adds a few more distant relatives.
+     Only species that share the closest neighbour's most specific marker
+     set are taken, so an added relative never pushes the tree onto a
+     broader set with fewer genes; only if that leaves fewer than --min, any
+     bacterial species is. With no skani hit at all this is where every
+     neighbour comes from (a possible new genus); otherwise it adds a few
+     more distant relatives, which also give the tree an outgroup.
 
 Marker set: the most specific GToTree set (lineage.tsv's gtotree_sets) that
 the closest neighbour and every other neighbour share, so a neighbourhood
@@ -111,24 +115,46 @@ def main():
         except FileNotFoundError:
             pass
     rows.sort(key=lambda r: -r[0])
-    for identity, qcov, taxid in rows:
-        if len(picked) >= args.max:
-            break
-        L = lineage.get(taxid)
-        sp = L and L['species_taxid']
-        if not sp or sp in species_seen:
-            continue
-        species_seen.add(sp)
-        if L['domain'] != 'Bacteria' or sp not in genomes_of:
-            continue
-        candidates = genomes_of[sp]
-        if closest is None:
-            closest = sp      # the closest species keeps all its type strains
-        else:
-            candidates = [next((g for g in candidates if g['taxid'] == taxid), candidates[0])]
-        for g in candidates:
-            if len(picked) < args.max:
-                add(g, '16S', identity=f'{identity:g}', qcov=f'{qcov:g}')
+
+    def sets_of(sp):
+        return lin(sp).get('gtotree_sets', 'Bacteria').split(',')
+
+    passed_over = set()   # species left out by the marker-set rule
+
+    def fill(same_set_only):
+        nonlocal closest
+        for identity, qcov, taxid in rows:
+            if len(picked) >= args.max:
+                break
+            L = lineage.get(taxid)
+            sp = L and L['species_taxid']
+            if not sp or sp in species_seen:
+                continue
+            if L['domain'] != 'Bacteria' or sp not in genomes_of:
+                species_seen.add(sp)
+                continue
+            # a relative outside the closest neighbour's most specific set would
+            # push the whole tree onto a broader set (e.g. Actinobacteria's 138
+            # genes -> Bacteria's 74), weakening the forks near the query
+            if same_set_only and closest is not None and sets_of(closest)[0] not in sets_of(sp):
+                passed_over.add(sp)
+                continue
+            species_seen.add(sp)
+            passed_over.discard(sp)
+            candidates = genomes_of[sp]
+            if closest is None:
+                closest = sp      # the closest species keeps all its type strains
+            else:
+                candidates = [next((g for g in candidates if g['taxid'] == taxid), candidates[0])]
+            for g in candidates:
+                if len(picked) < args.max:
+                    add(g, '16S', identity=f'{identity:g}', qcov=f'{qcov:g}')
+
+    # first only relatives sharing the closest neighbour's marker set; only if
+    # that leaves too few for a tree, any bacterial species with a genome
+    fill(same_set_only=True)
+    if len(picked) < args.min:
+        fill(same_set_only=False)
 
     # marker set shared by all
     gene_set = 'Bacteria'
@@ -143,6 +169,7 @@ def main():
         'neighbours': len(picked),
         'from_skani': sum(p['source'] == 'skani' for p in picked),
         'from_16S': sum(p['source'] == '16S' for p in picked),
+        'passed_over_for_marker_set': len(passed_over),
         'gtotree_set': gene_set,
         'min_neighbours': args.min,
         'max_neighbours': args.max,
