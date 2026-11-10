@@ -66,6 +66,8 @@ process SPECIES_TREE {
     tuple val(sample), path("tree.nwk"), emit: tree, optional: true
     path "tree_report.txt", optional: true
     path "tree_info.json"
+    // not published; declared so they come back from a Batch VM to the work dir
+    path "{gtotree,iqtree}.log", optional: true
 
     script:
     """
