@@ -62,7 +62,7 @@
           "type": "boolean",
           "default": true,
           "description": "Subsample each sample's filtered reads to --target_coverage before assembly.",
-          "help_text": "Flye fails on very deep data (a ~91 kb phage at ~5,000x gave 'No disjointigs were assembled'). Reads are picked at random with Rasusa, so plasmids keep their share. A sample below the target keeps every filtered read. Flye and Medaka both use the subsampled reads; {sample}/reads/{sample}.downsampling.tsv records the depth before and after."
+          "help_text": "Flye fails on very deep data (a ~91 kb phage at ~5,000x gave 'No disjointigs were assembled'). Reads are picked at random with Rasusa, so plasmids keep their share. A sample below the target keeps every filtered read. Flye and Medaka both use the subsampled reads; {sample}/reads/{sample}.downsampling.tsv records the depth before and after. If Flye still fails on depth (the genome size couldn't be estimated, or was far off), it retries once on a share of the reads sized from its own coverage measurement; {sample}/assembly/flye/flye_reads.tsv records that."
         },
         "target_coverage": {
           "type": "integer",

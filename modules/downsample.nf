@@ -28,8 +28,10 @@ process DOWNSAMPLE_PLAN {
 
     script:
     """
-    # chopper writes 4-line records, so every 4th line from the 2nd is sequence
-    READ_BASES=\$(zcat -f ${reads} | awk 'NR % 4 == 2 { b += length(\$0) } END { printf "%d", b }')
+    # chopper writes 4-line records, so every 4th line from the 2nd is sequence.
+    # %.0f, not %d: this awk clamps %d at 2^31, so a sample over ~2.1 Gb came
+    # out as -2147483648 and skipped downsampling (CFT073, 2026-11-10)
+    READ_BASES=\$(zcat -f ${reads} | awk 'NR % 4 == 2 { b += length(\$0) } END { printf "%.0f", b }')
 
     if [ "${genome_size}" -gt 0 ]; then
         GENOME_SIZE=${genome_size}

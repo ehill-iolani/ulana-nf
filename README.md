@@ -12,7 +12,7 @@ detection (the same steps and feature toggles as the Snakemake/RShiny original).
 2. `CHOPPER` -- quality + length filtering
    - `READ_STATS` (side branch, `--enable_read_stats`, on by default) -- read length and mean Q-score before vs. after filtering
    - `DOWNSAMPLE_PLAN` + `DOWNSAMPLE` -- cap very deep samples at `--target_coverage` before assembly (on by default, see [Downsampling](#downsampling))
-3. `FLYE_ASSEMBLY` -- assembly
+3. `FLYE_ASSEMBLY` -- assembly; a contig holding several copies of a plasmid is cut to one (see [One copy per plasmid](#one-copy-per-plasmid))
 4. `BANDAGE_IMAGE` -- render a PNG of the Flye assembly graph (optional, default on)
 5. `MEDAKA_POLISH` -- polish (optional, default on)
 6. `PROKKA` -- annotate (optional, default on)
@@ -140,7 +140,7 @@ run `nextflow run main.nf --help`. Key ones:
 results/
   {sample}/
     reads/            merged + filtered fastq, {sample}.downsampling.tsv (only if --enable_downsampling)
-    assembly/flye/    assembly.fasta, assembly_info.txt, assembly_graph.gfa, assembly_graph.png (only if --enable_bandage)
+    assembly/flye/    assembly.fasta, assembly_info.txt, assembly_graph.gfa, flye_reads.tsv, copies.tsv, assembly_graph.png (only if --enable_bandage)
     polish/medaka/    polished_consensus.fasta (only if --enable_medaka)
     annotation/prokka/  .tsv .faa .ffn .gff (only if --enable_prokka)
     qc/checkm/        summary.tsv (only if --enable_checkm)
@@ -161,6 +161,7 @@ main.nf                     entry point, samplesheet parsing, --help
 workflows/ulana_wgs.nf       subworkflow chaining all steps
 modules/*.nf                 one process per tool, one container each
 bin/read_stats.py            read length/Q-score summary (stdlib only; also runs stand-alone)
+bin/collapse_copies.py       cuts a contig made of back-to-back copies of one plasmid to one copy (stdlib only)
 bin/pick_genes.sh            pulls the identifier genes out of Prokka's .ffn, one record per copy
 bin/genbank_prep.py          Prokka .fsa/.tbl -> GenBank-ready files (stdlib only; also runs stand-alone)
 bin/species_hits.sh          skani hits + typestrains.tsv -> species_check/genome_hits.tsv
@@ -214,6 +215,56 @@ the decision:
 Set `--genome_size` when every sample in the run is the same organism;
 leave it blank for a run mixing organisms. `--enable_downsampling false`
 assembles every read regardless.
+
+### Second Flye try when the cap misses
+
+The cap is only as good as the genome size, and a sample whose size LRGE
+couldn't estimate keeps every read. Flye measures the depth itself before it
+gives up ("Overlap-based coverage"), so when it fails with "No disjointigs
+were assembled" at more than `--target_coverage`, `FLYE_ASSEMBLY` takes a
+seeded random `target / measured` share of the reads and runs Flye once
+more. Any other Flye error, or a second failure, still fails the sample. Off
+with `--enable_downsampling false`. Medaka still polishes with every read
+Flye was given at first. `assembly/flye/flye_reads.tsv` records it:
+
+| Column | Meaning |
+|---|---|
+| `reads_used` | `all`, or `subset` after a second try |
+| `subset_fraction` | share of the reads assembled on the second try (`1` otherwise) |
+| `first_try_coverage` | Flye's overlap-based coverage on the reads it was given |
+| `assembled_coverage` | the same on the reads it assembled |
+
+`modules/flye.nf` and `modules/downsample.nf` are shared with
+[ulana-phage-nf](https://github.com/ehill-iolani/ulana-phage-nf) (apart from
+its phage size limits); keep fixes in step between the two repos.
+
+## One copy per plasmid
+
+Flye sometimes reports a small circular plasmid as a single contig holding
+two or more back-to-back copies: *K. pneumoniae* MGH 78578's 3,478 bp pKPN7
+came out at 6,956 bp in validation. The results would then show the plasmid
+at twice its size with every gene twice, and Medaka polishes such a contig
+badly, since each read fits either copy. `FLYE_ASSEMBLY` runs
+`bin/collapse_copies.py` on Flye's contigs and cuts such a contig to one copy
+before Medaka, Prokka and AMRFinderPlus see it.
+
+A contig is cut only when at least 80% of the k-mers that could recur one
+copy-length later do, the repeat spans at least 90% of a copy, and a copy is
+at least 1 kb. Repeats inside a chromosome (rRNA operons, IS elements) are far
+shorter than the contig and are left alone. The cut is where the contig's
+start comes round again, so the kept copy joins up end to start. On the
+validation drafts (8 reference-strain and 11 *E. coli* assemblies) it cut only
+plasmid-size contigs, never a chromosome, and the cut pKPN7 matched RefSeq
+base for base. `assembly_info.txt` and the graph stay as Flye made them;
+`assembly/flye/copies.tsv` lists what was cut (only its header when nothing
+was):
+
+| Column | Meaning |
+|---|---|
+| `contig` | Flye's contig name, kept on the cut contig |
+| `flye_length`, `copy_length` | bp before and after |
+| `copies` | `flye_length / copy_length` (e.g. `2.00`) |
+| `shared_kmers` | share of the k-mers that recur one copy later |
 
 ## Species check
 
