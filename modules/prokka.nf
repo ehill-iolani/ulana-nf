@@ -14,6 +14,8 @@ process PROKKA {
     tuple val(sample), path("prokka_annotation.faa"), emit: faa
     tuple val(sample), path("prokka_annotation.ffn"), emit: ffn
     tuple val(sample), path("prokka_annotation.gff"), emit: gff
+    // the contigs as Prokka named them, for AMRFinder's nucleotide search
+    tuple val(sample), path("prokka_annotation.fna"), emit: fna
     tuple val(sample), path("prokka_annotation.fsa"), path("prokka_annotation.tbl"), emit: genbank
     tuple val(sample), path("prokka.version"), emit: version
 

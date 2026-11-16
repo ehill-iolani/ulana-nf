@@ -126,7 +126,7 @@ run `nextflow run main.nf --help`. Key ones:
 | `--enable_prokka` | `true` | Prokka annotation |
 | `--enable_checkm` | `true` | CheckM QC |
 | `--enable_id_genes` | `true` | Marker gene extraction (requires `--enable_prokka`) |
-| `--enable_amrfinder` | `true` | AMRFinderPlus AMR detection (requires `--enable_prokka`); DB is downloaded fresh every run |
+| `--enable_amrfinder` | `true` | AMRFinderPlus AMR detection on Prokka's proteins and the contigs (requires `--enable_prokka`; see [AMR detection](#amr-detection)); DB is downloaded fresh every run |
 | `--enable_genbank` | `false` | GenBank submission files (requires `--enable_prokka` and the samplesheet's `organism` + `locus_tag` columns) |
 | `--genbank_template` | *(none)* | NCBI submitter template (`.sbt`) to build into the `.sqn` |
 | `--enable_species_check` | `true` | Closest NCBI type strains by genome ANI and 16S (skipped with a warning without `--species_db`) |
@@ -286,6 +286,37 @@ was):
 | `flye_length`, `copy_length` | bp before and after |
 | `copies` | `flye_length / copy_length` (e.g. `2.00`) |
 | `shared_kmers` | share of the k-mers that recur one copy later |
+
+## AMR detection
+
+AMRFinderPlus runs in combined mode: it searches Prokka's proteins (`-p`,
+with the GFF for positions) and also does a translated search of the
+contigs themselves (`-n`, Prokka's `.fna`, so the contig names match the
+GFF). The protein search alone misses a resistance gene that is in the
+assembly but that Prokka called short or never called, and AMRFinder drops
+a protein under 50% of the reference length. On the CUPID carbapenemase
+isolates (ENA PRJEB108076, 2026-11) the protein-only search missed two of
+ten carbapenemases that the assembly carried:
+
+- *Serratia*: blaOXA-48 was in the assembly with 798/798 bases identical,
+  but Prokka started the gene at an internal codon (396 bp), so the protein
+  fell under the cutoff. Combined mode: `ALLELEX`, 100% coverage and
+  identity.
+- *K. michiganensis*: blaVIM-1 is split across two contig ends by an IS26
+  repeat. Combined mode: `PARTIAL_CONTIG_ENDX`, 60.9% coverage.
+
+On nine of the ten (the tenth wasn't rerun) it also gave the exact allele where the protein
+search stopped at the family (`aac(6')-Ib-cr` -> `aac(6')-Ib-cr5`,
+`blaOXA` -> `blaOXA-1`) and found a few more genes (dfrA14, qnrS, mer
+operon genes, qacE). It never lost a gene the protein search found.
+
+What changes in `amrfinder_pro_results.tsv`: the columns are the same.
+A hit found only on the contigs has a `Method` ending in `X` (`EXACTX`,
+`ALLELEX`, `BLASTX`, `PARTIALX`, `PARTIAL_CONTIG_ENDX`) and `Protein id` `NA`,
+since there is no Prokka protein for it; `INTERNAL_STOP` marks a gene with a
+stop codon inside it. `amrfinder_pro.fasta` still holds only the hits that
+have a Prokka protein. Point mutations still need `-O <organism>`, which
+the pipeline doesn't pass.
 
 ## Species check
 

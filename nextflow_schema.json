@@ -178,7 +178,7 @@
           "type": "boolean",
           "default": true,
           "description": "Run AMRFinderPlus on the annotated assembly.",
-          "help_text": "Requires --enable_prokka. The AMRFinderPlus database is downloaded fresh at the start of every run."
+          "help_text": "Requires --enable_prokka. Searches both Prokka's proteins and the contigs themselves, so a gene Prokka called short or that runs off a contig end is still found. The AMRFinderPlus database is downloaded fresh at the start of every run."
         }
       }
     },
