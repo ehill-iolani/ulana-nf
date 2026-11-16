@@ -125,9 +125,9 @@
         },
         "medaka_model": {
           "type": "string",
-          "default": "r1041_e82_400bps_hac_v5.0.0",
+          "default": "r1041_e82_400bps_bacterial_methylation",
           "description": "Medaka consensus model name.",
-          "help_text": "Must match the basecaller/flowcell/chemistry combination used to generate the reads -- see `medaka tools list_models`."
+          "help_text": "The default is Medaka's bacterial model for native (methylated) bacterial DNA, compatible with R10.4.1 reads from several basecaller versions; on the 2026-11 validation sets it left 3-4x fewer errors than sup_v4.3.0. For other chemistries pick the model that matches the basecaller/flowcell -- see `medaka tools list_models`."
         }
       }
     },

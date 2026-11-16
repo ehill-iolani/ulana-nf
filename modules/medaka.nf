@@ -6,9 +6,9 @@ process MEDAKA_POLISH {
     // Docker emulation on Apple Silicon). Pinned to a digest tag (not the
     // floating `latest`) rather than a numbered release: as of this writing
     // the newest numbered tag is v1.11.3 (medaka 1.x), whose bundled model
-    // list tops out at v4.3.0 and rejects the v5.0.0 default model this
-    // pipeline uses (matching ulana-ht's config.yaml); this digest is
-    // medaka 2.2.1, which knows v5.0.0.
+    // list tops out at v4.3.0 and lacks both v5.0.0 models and the default
+    // r1041_e82_400bps_bacterial_methylation; this digest is medaka 2.2.1,
+    // which knows both.
     container "${params.dockerhub_registry}/ontresearch/medaka:shaf39439188c323053e66cf79618fae1ab33d1b38a"
     // the .version is for the GenBank assembly comment, not a result
     publishDir(path: { "${params.outdir}/${sample}/polish/medaka" }, mode: 'copy', saveAs: { it.endsWith('.version') ? null : it })

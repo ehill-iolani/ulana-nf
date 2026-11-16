@@ -122,7 +122,7 @@ run `nextflow run main.nf --help`. Key ones:
 | `--genome_size` | *(blank: LRGE estimates it per sample)* | Genome size the target coverage is worked out from, e.g. `92kb`, `5.5mb` |
 | `--flye_mode` | `--nano-hq` | Flye read-type flag |
 | `--enable_bandage` / `--bandage_height` | `true` / `1000` | Render a PNG of the Flye assembly graph |
-| `--enable_medaka` / `--medaka_model` | `true` / `r1041_e82_400bps_hac_v5.0.0` | Medaka polishing |
+| `--enable_medaka` / `--medaka_model` | `true` / `r1041_e82_400bps_bacterial_methylation` | Medaka polishing (Medaka's bacterial model for native R10.4.1 DNA; see [Medaka model](#medaka-model)) |
 | `--enable_prokka` | `true` | Prokka annotation |
 | `--enable_checkm` | `true` | CheckM QC |
 | `--enable_id_genes` | `true` | Marker gene extraction (requires `--enable_prokka`) |
@@ -237,6 +237,27 @@ Flye was given at first. `assembly/flye/flye_reads.tsv` records it:
 `modules/flye.nf` and `modules/downsample.nf` are shared with
 [ulana-phage-nf](https://github.com/ehill-iolani/ulana-phage-nf) (apart from
 its phage size limits); keep fixes in step between the two repos.
+
+## Medaka model
+
+The default `--medaka_model` is `r1041_e82_400bps_bacterial_methylation`,
+Medaka's model for native bacterial DNA (the one its `--bacteria` flag picks).
+Native DNA carries the host's methylation, which shifts the nanopore signal at
+modified motifs, and the general hac/sup models leave errors there. Medaka lists
+it as compatible with R10.4.1 reads from several basecaller versions. Until
+v0.4.0 the default was `r1041_e82_400bps_hac_v5.0.0`.
+
+On the 2026-11 validation sets, polishing the same Flye drafts with this model
+instead of `r1041_e82_400bps_sup_v4.3.0`:
+
+| Set | Errors vs. reference, sup_v4.3.0 | bacterial_methylation |
+|---|---|---|
+| NanoVarBench, 14 isolates | 64 | 19 |
+| Reference strains, Dorado 0.5.3 sup (CFT073, MGH 78578, MRSA252, PAO1) | 40 | 9 |
+
+It was better or equal on every genome. For R9.4.1 reads pass the model that
+matches your basecaller (`medaka tools list_models` lists them). It is trained
+for native DNA, so don't expect the gain on amplified (unmethylated) DNA.
 
 ## One copy per plasmid
 
