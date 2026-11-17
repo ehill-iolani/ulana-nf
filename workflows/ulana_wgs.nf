@@ -123,11 +123,11 @@ workflow ULANA_WGS {
     // 8. AMR detection -- optional, requires prokka
     if (params.enable_amrfinder) {
         if (!params.enable_prokka) {
-            error "--enable_amrfinder requires --enable_prokka (AMRFinder needs Prokka's .faa/.gff output)"
+            error "--enable_amrfinder requires --enable_prokka (AMRFinder needs Prokka's .faa/.gff/.fna output)"
         }
         AMRFINDER_DB()
         AMRFINDER(
-            PROKKA.out.faa.join(PROKKA.out.gff),
+            PROKKA.out.faa.join(PROKKA.out.gff).join(PROKKA.out.fna),
             AMRFINDER_DB.out.db.first()
         )
     }
